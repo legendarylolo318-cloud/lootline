@@ -1,0 +1,32 @@
+name = "High Contrast"
+author = "Lootline"
+dark = true
+
+[colors]
+bg = "#000000"
+surface = "#000000"
+surface_alt = "#101010"
+border = "#ffffff"
+text = "#ffffff"
+text_dim = "#d0d0d0"
+accent = "#ffff00"
+accent_alt = "#00ffff"
+on_accent = "#000000"
+good = "#00ff66"
+bad = "#ff4040"
+warn = "#ffaa00"
+
+[rarity]
+common = "#d0d0d0"
+uncommon = "#00ff66"
+rare = "#4da6ff"
+epic = "#e070ff"
+legendary = "#ffb000"
+mythic = "#ff40c0"
+mythic_alt = "#ffff00"
+
+[shape]
+radius = 6
+radius_small = 8
+font = "Segoe UI"
+glow = 0.0

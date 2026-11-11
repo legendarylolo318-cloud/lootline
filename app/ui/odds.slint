@@ -1,0 +1,171 @@
+import { Theme } from "theme.slint";
+import { Backend, OddsRow } from "backend.slint";
+import { T, Dim, Card, RarityChip, ScrollBox, LuckBar, SegControl } from "widgets.slint";
+
+component HeadCell inherits Rectangle {
+    in property <string> text;
+    in property <int> column-id;
+    callback clicked();
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        spacing: 4px;
+        Dim {
+            text: root.text;
+            font-weight: 700;
+            vertical-alignment: center;
+            color: Backend.sort-col == root.column-id ? Theme.accent : Theme.text-dim;
+        }
+        Dim {
+            text: Backend.sort-col == root.column-id ? (Backend.sort-asc ? "▲" : "▼") : "";
+            vertical-alignment: center;
+            font-size: 9px;
+            color: Theme.accent;
+        }
+    }
+}
+
+component Cell inherits Rectangle {
+    in property <string> tip;
+    TouchArea {
+        changed has-hover => {
+            if self.has-hover && root.tip != "" { Backend.tip = root.tip; }
+        }
+    }
+    @children
+}
+
+component Row inherits Rectangle {
+    in property <OddsRow> r;
+    height: 46px;
+    border-radius: Theme.radius-small;
+    background: r.is-group ? Theme.surface-alt.with-alpha(0.55) : transparent;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        Rectangle {
+            horizontal-stretch: 3;
+            HorizontalLayout {
+                spacing: 10px;
+                Rectangle {
+                    width: 4px;
+                    height: 22px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 2px;
+                    background: Theme.rarity-brush(r.rarity);
+                }
+                T {
+                    text: r.name;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    font-weight: r.is-group ? 800 : 500;
+                }
+            }
+        }
+        Rectangle {
+            width: 100px;
+            RarityChip { rarity: r.rarity; y: (parent.height - self.height) / 2; }
+        }
+        Cell { width: 70px; tip: r.tip-p; T { text: r.p; vertical-alignment: center; } }
+        Cell { width: 76px; tip: r.tip-expected; T { text: r.expected; vertical-alignment: center; } }
+        Cell { width: 52px; T { text: "\{r.got}"; vertical-alignment: center; font-weight: 700; } }
+        Cell { width: 76px; tip: r.tip-p1; T { text: r.p1; vertical-alignment: center; } }
+        Cell {
+            width: 190px;
+            tip: r.tip-luck;
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    LuckBar { width: parent.width; y: (parent.height - self.height) / 2; value: r.luck; }
+                }
+                Dim { width: 46px; text: r.luck-text; vertical-alignment: center; horizontal-alignment: right; }
+            }
+        }
+        Cell { width: 76px; tip: r.tip-dry; T { text: r.dry; vertical-alignment: center; color: Theme.text-dim; } }
+    }
+}
+
+export component OddsPage inherits Rectangle {
+    VerticalLayout {
+        padding: 28px;
+        spacing: 14px;
+        HorizontalLayout {
+            spacing: 12px;
+            VerticalLayout {
+                T { text: "Odds"; font-size: 26px; font-weight: 800; }
+                Dim { text: "Per-chest drop chances versus what you actually got."; }
+            }
+            Rectangle { }
+            SegControl {
+                options: ["This match", "Session", "Lifetime"];
+                current <=> Backend.scope;
+                selected(i) => { Backend.scope-changed(i); }
+            }
+            SegControl {
+                options: ["Me", "Party"];
+                current <=> Backend.who;
+                selected(i) => { Backend.who-changed(i); }
+            }
+        }
+        if Backend.placeholder-table: Rectangle {
+            height: 38px;
+            border-radius: Theme.radius-small;
+            background: Theme.warn.transparentize(0.85);
+            border-width: 1px;
+            border-color: Theme.warn.transparentize(0.5);
+            T {
+                x: 14px;
+                width: parent.width - 28px;
+                height: parent.height;
+                vertical-alignment: center;
+                text: Backend.table-note;
+                color: Theme.warn;
+                overflow: elide;
+            }
+        }
+        Card {
+            VerticalLayout {
+                padding: 14px;
+                spacing: 4px;
+                HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 10px;
+                    height: 28px;
+                    HeadCell { horizontal-stretch: 3; text: "Item"; column-id: 0; clicked => { Backend.sort-odds(0); } }
+                    HeadCell { width: 100px; text: "Rarity"; column-id: 1; clicked => { Backend.sort-odds(1); } }
+                    HeadCell { width: 70px; text: "p"; column-id: 2; clicked => { Backend.sort-odds(2); } }
+                    HeadCell { width: 76px; text: "Expected"; column-id: 3; clicked => { Backend.sort-odds(3); } }
+                    HeadCell { width: 52px; text: "Got"; column-id: 4; clicked => { Backend.sort-odds(4); } }
+                    HeadCell { width: 76px; text: "P(≥1)"; column-id: 5; clicked => { Backend.sort-odds(5); } }
+                    HeadCell { width: 190px; text: "Luck"; column-id: 6; clicked => { Backend.sort-odds(6); } }
+                    HeadCell { width: 76px; text: "Dry"; column-id: 7; clicked => { Backend.sort-odds(7); } }
+                }
+                Rectangle { height: 1px; background: Theme.border; }
+                ScrollBox {
+                    VerticalLayout {
+                        spacing: 2px;
+                        for r in Backend.odds: Row { r: r; }
+                    }
+                }
+            }
+        }
+        Card {
+            height: 52px;
+            background: Theme.surface-alt;
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                T {
+                    text: Backend.tip;
+                    vertical-alignment: center;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

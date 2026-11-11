@@ -1,0 +1,198 @@
+// Data and callbacks shared between the Rust app and the UI pages.
+
+export struct PlayerRow {
+    id: string,
+    name: string,
+    color: color,
+    chests: int,
+    connected: bool,
+    detecting: bool,
+    is-me: bool,
+    is-host: bool,
+    initial: string,
+}
+
+export struct FeedRow {
+    who: string,
+    who-color: color,
+    rarity: int,
+    item: string,
+    time: string,
+}
+
+export struct OddsRow {
+    name: string,
+    rarity: int,
+    is-group: bool,
+    p: string,
+    expected: string,
+    got: int,
+    p1: string,
+    luck: float,
+    luck-text: string,
+    dry: string,
+    tip-p: string,
+    tip-expected: string,
+    tip-p1: string,
+    tip-luck: string,
+    tip-dry: string,
+}
+
+export struct HistRow {
+    is-header: bool,
+    title: string,
+    sub: string,
+    count: int,
+    id: string,
+    selected: bool,
+}
+
+export struct StatRow {
+    name: string,
+    color: color,
+    count: int,
+    lifetime: int,
+    frac: float,
+}
+
+export struct BarDatum {
+    label: string,
+    value: int,
+    rarity: int,
+    frac: float,
+}
+
+export struct ThemeChip {
+    name: string,
+    bg: color,
+    surface: color,
+    accent: color,
+    active: bool,
+}
+
+export struct ColorField {
+    key: string,
+    label: string,
+    hex: string,
+    value: color,
+}
+
+export struct ItemRow {
+    name: string,
+    rarity: int,
+}
+
+export global Backend {
+    // ---- navigation / scope
+    in-out property <int> page: 0;
+    in-out property <int> scope: 0;
+    in-out property <int> who: 0;
+    in property <string> toast;
+    in property <string> version: "0.1.0";
+
+    // ---- dashboard
+    in property <int> my-chests;
+    in property <int> party-chests;
+    in property <int> scope-chests;
+    in property <float> luck: 0.5;
+    in property <bool> luck-tagged: false;
+    in property <string> luck-label: "Average";
+    in property <string> luck-sub;
+    in property <[FeedRow]> feed;
+    in property <[PlayerRow]> players;
+    in property <int> glow-rarity: -1;
+    in property <string> detect-status: "Detection off";
+    in property <bool> detect-ok;
+    in property <bool> detection-available;
+    in property <string> hotkey-hint;
+    in property <bool> placeholder-table;
+    in property <string> table-note;
+
+    // ---- odds
+    in property <[OddsRow]> odds;
+    in-out property <int> sort-col: 0;
+    in-out property <bool> sort-asc: true;
+    in-out property <string> tip: "Hover a number to see the formula with the real values plugged in.";
+
+    // ---- history
+    in property <[HistRow]> history;
+    in property <string> hist-title;
+    in property <[StatRow]> hist-players;
+    in property <[BarDatum]> hist-bars;
+    in property <[StatRow]> lifetime-players;
+    in property <[BarDatum]> lifetime-bars;
+    in property <int> lifetime-total;
+
+    // ---- party
+    in property <bool> in-party;
+    in property <string> link-text: "Not in a party";
+    in property <string> party-code;
+    in property <string> my-code;
+    in property <[PlayerRow]> roster;
+    in property <bool> i-am-host;
+    in property <string> net-notice;
+    in-out property <string> join-input;
+
+    // ---- settings values
+    in-out property <string> player-name;
+    in-out property <string> player-color;
+    in-out property <string> interact-key;
+    in-out property <string> hotkey-add;
+    in-out property <string> hotkey-undo;
+    in-out property <float> sensitivity: 0.5;
+    in-out property <bool> detection-enabled: true;
+    in-out property <bool> overlay-enabled: true;
+    in-out property <string> overlay-x;
+    in-out property <string> overlay-y;
+    in-out property <string> overlay-w;
+    in-out property <string> overlay-h;
+    in-out property <string> overlay-timeout;
+    in-out property <bool> minimize-to-tray: true;
+    in-out property <bool> start-minimized: false;
+    in-out property <string> season;
+    in-out property <string> repo-url;
+    in-out property <string> template-name: "chest";
+    in property <string> template-status;
+    in property <bool> recording;
+    in property <string> loot-status;
+    in property <string> templates-info;
+    in property <string> settings-msg;
+
+    // ---- theme editor
+    in property <[ThemeChip]> themes;
+    in property <[ColorField]> color-fields;
+    in property <[ColorField]> rarity-fields;
+    in property <[ColorField]> palette;
+    in-out property <string> theme-name;
+    in property <string> theme-msg;
+    in-out property <string> theme-import-text;
+
+    // ---- callbacks
+    callback add-chest();
+    callback new-match();
+    callback undo-chest();
+    callback scope-changed(int);
+    callback who-changed(int);
+    callback sort-odds(int);
+    callback select-history(string);
+    callback create-party();
+    callback join-party(string);
+    callback leave-party();
+    callback copy-text(string);
+    callback paste-join();
+    callback kick(string);
+    callback apply-settings();
+    callback record-template();
+    callback fetch-loot();
+    callback fetch-templates();
+    callback test-overlay();
+    callback pick-theme(string);
+    callback edit-color(string, string);
+    callback edit-rarity(string, string);
+    callback reset-rarity();
+    callback save-theme();
+    callback export-theme();
+    callback import-theme();
+    callback open-themes-folder();
+    callback hide-to-tray();
+}

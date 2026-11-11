@@ -1,0 +1,273 @@
+import { Theme } from "theme.slint";
+import { Backend, PlayerRow, FeedRow } from "backend.slint";
+import { T, Dim, Card, Btn, Dot, RarityChip, ScrollBox, BigCounter, GlowFrame, LuckGauge, SegControl } from "widgets.slint";
+
+component PartyLine inherits Rectangle {
+    in property <PlayerRow> rw;
+    height: 40px;
+    border-radius: Theme.radius-small;
+    background: rw.is-me ? Theme.surface-alt : transparent;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 12px;
+        spacing: 10px;
+        alignment: stretch;
+        Rectangle {
+            width: 10px;
+            Rectangle {
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                background: rw.color;
+            }
+        }
+        T {
+            text: rw.name + (rw.is-me ? "  (you)" : "");
+            vertical-alignment: center;
+            overflow: elide;
+            font-weight: 600;
+        }
+        Dim {
+            text: rw.is-host ? "HOST" : "";
+            vertical-alignment: center;
+            color: Theme.warn;
+            font-weight: 700;
+            font-size: 10px;
+        }
+        Dim {
+            text: rw.detecting ? "detecting" : "viewer";
+            vertical-alignment: center;
+            font-size: 11px;
+        }
+        Dot {
+            on: rw.connected;
+            y: (parent.height - self.height) / 2;
+        }
+        T {
+            width: 48px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            text: "\{rw.chests}";
+            font-size: 18px;
+            font-weight: 800;
+        }
+    }
+}
+
+component FeedLine inherits Rectangle {
+    in property <FeedRow> rw;
+    height: 44px;
+    border-radius: Theme.radius-small;
+    background: rw.rarity >= 4 ? Theme.rarity-color(rw.rarity).transparentize(0.9) : transparent;
+    Rectangle {
+        x: 0px;
+        width: 4px;
+        height: parent.height - 12px;
+        y: 6px;
+        border-radius: 2px;
+        background: Theme.rarity-brush(rw.rarity);
+    }
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 10px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            spacing: 1px;
+            T {
+                text: rw.item == "" ? Theme.rarity-name(rw.rarity) : rw.item;
+                font-weight: 700;
+                overflow: elide;
+                color: rw.rarity < 0 ? Theme.text-dim : Theme.rarity-color(rw.rarity);
+            }
+            Dim {
+                text: rw.who;
+                font-size: 11px;
+                overflow: elide;
+            }
+        }
+        Dim {
+            text: rw.time;
+            vertical-alignment: center;
+            horizontal-alignment: right;
+            width: 52px;
+        }
+    }
+}
+
+export component DashboardPage inherits Rectangle {
+    ScrollBox {
+        VerticalLayout {
+            padding: 28px;
+            spacing: 18px;
+            // ---------- header
+            HorizontalLayout {
+                spacing: 14px;
+                VerticalLayout {
+                    T { text: "Dashboard"; font-size: 26px; font-weight: 800; }
+                    Dim { text: Backend.hotkey-hint; }
+                }
+                Rectangle { }
+                Rectangle {
+                    width: 240px;
+                    height: 34px;
+                    border-radius: 17px;
+                    background: Theme.surface;
+                    border-width: 1px;
+                    border-color: Backend.detect-ok ? Theme.good.transparentize(0.4) : Theme.border;
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        spacing: 8px;
+                        Rectangle {
+                            width: 10px;
+                            Dot { on: Backend.detect-ok; }
+                        }
+                        Dim { text: Backend.detect-status; vertical-alignment: center; overflow: elide; }
+                    }
+                }
+                Btn { text: "New match"; clicked => { Backend.new-match(); } }
+                Btn { text: "Undo"; clicked => { Backend.undo-chest(); } }
+                Btn { text: "+ Add chest"; primary: true; clicked => { Backend.add-chest(); } }
+            }
+
+            // ---------- hero rw
+            HorizontalLayout {
+                spacing: 18px;
+                Card {
+                    horizontal-stretch: 3;
+                    height: 250px;
+                    GlowFrame { width: parent.width; height: parent.height; rarity: Backend.glow-rarity; }
+                    // accent wash
+                    Rectangle {
+                        x: 1px;
+                        y: 1px;
+                        width: parent.width - 2px;
+                        height: 5px;
+                        border-radius: 2px;
+                        background: Theme.accent-gradient;
+                    }
+                    HorizontalLayout {
+                        padding: 28px;
+                        spacing: 28px;
+                        VerticalLayout {
+                            alignment: center;
+                            Dim { text: "YOUR CHESTS"; font-weight: 700; letter-spacing: 2px; }
+                            BigCounter { value: Backend.my-chests; size: 96px; height: 120px; tint: Theme.text; }
+                            Dim { text: "\{Backend.scope-chests} counted in the selected scope"; }
+                        }
+                        Rectangle {
+                            width: 1px;
+                            background: Theme.border;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Dim { text: "WHOLE PARTY"; font-weight: 700; letter-spacing: 2px; }
+                            BigCounter { value: Backend.party-chests; size: 72px; height: 92px; tint: Theme.accent; }
+                            Dim { text: Backend.in-party ? "everyone's chests added together" : "you're solo, invite friends in Party"; }
+                        }
+                    }
+                }
+                Card {
+                    horizontal-stretch: 2;
+                    height: 250px;
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 4px;
+                        Dim { text: "LUCK METER"; font-weight: 700; letter-spacing: 2px; }
+                        Rectangle {
+                            LuckGauge {
+                                width: Math.min(parent.width, (parent.height - 62px) * 1.78);
+                                height: self.width / 1.78;
+                                x: (parent.width - self.width) / 2;
+                                value: Backend.luck;
+                            }
+                            T {
+                                y: parent.height - 56px;
+                                width: 100%;
+                                horizontal-alignment: center;
+                                text: Backend.luck-label;
+                                font-size: 22px;
+                                font-weight: 800;
+                                color: Backend.luck-tagged ? Theme.luck-color(Backend.luck) : Theme.text-dim;
+                            }
+                            Dim {
+                                y: parent.height - 26px;
+                                width: 100%;
+                                horizontal-alignment: center;
+                                text: Backend.luck-sub;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---------- scope selector
+            HorizontalLayout {
+                spacing: 12px;
+                SegControl {
+                    options: ["This match", "Session", "Lifetime"];
+                    current <=> Backend.scope;
+                    selected(i) => { Backend.scope-changed(i); }
+                }
+                SegControl {
+                    options: ["Me only", "Whole party"];
+                    current <=> Backend.who;
+                    selected(i) => { Backend.who-changed(i); }
+                }
+                Rectangle { }
+            }
+
+            // ---------- party + feed
+            HorizontalLayout {
+                spacing: 18px;
+                Card {
+                    horizontal-stretch: 1;
+                    min-height: 300px;
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            Dim { text: "LIVE PARTY"; font-weight: 700; letter-spacing: 2px; }
+                            Rectangle { }
+                            Dim { text: Backend.link-text; }
+                        }
+                        for p in Backend.players: PartyLine { rw: p; }
+                        if Backend.players.length == 0: Dim { text: "No players yet."; }
+                        Rectangle { }
+                        Rectangle { height: 1px; background: Theme.border; }
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 12px;
+                            height: 34px;
+                            T { text: "Party total"; vertical-alignment: center; font-weight: 700; }
+                            Rectangle { }
+                            T {
+                                text: "\{Backend.party-chests}";
+                                vertical-alignment: center;
+                                font-size: 20px;
+                                font-weight: 800;
+                                color: Theme.accent;
+                            }
+                        }
+                    }
+                }
+                Card {
+                    horizontal-stretch: 1;
+                    min-height: 300px;
+                    VerticalLayout {
+                        padding: 20px;
+                        spacing: 6px;
+                        Dim { text: "RECENT OPENS"; font-weight: 700; letter-spacing: 2px; }
+                        if Backend.feed.length == 0: Dim {
+                            text: "Nothing yet. Open a chest or press your add-chest hotkey.";
+                            wrap: word-wrap;
+                        }
+                        for f in Backend.feed: FeedLine { rw: f; }
+                        Rectangle { }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,142 @@
+import { Theme } from "theme.slint";
+import { ItemRow } from "backend.slint";
+import { T, Dim, ScrollBox } from "widgets.slint";
+
+// Small borderless always-on-top window for one-click rarity tagging.
+export component OverlayWindow inherits Window {
+    no-frame: true;
+    always-on-top: true;
+    background: Theme.bg;
+    title: "Lootline overlay";
+    default-font-family: Theme.font;
+
+    in property <bool> running: false;
+    in property <duration> timeout: 3s;
+    in property <[ItemRow]> items;
+    in property <string> who;
+    in-out property <bool> expanded: false;
+
+    callback tag(int);
+    callback tag-item(string, int);
+    callback dismiss();
+    callback expand-changed(bool);
+
+    property <float> progress: 1.0;
+    states [
+        counting when root.running && !root.expanded: {
+            progress: 0.0;
+            in { animate progress { duration: root.timeout; easing: linear; } }
+            out { animate progress { duration: 0ms; } }
+        }
+    ]
+
+    Rectangle {
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: Theme.accent;
+        background: Theme.surface;
+        clip: true;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 8px;
+                T {
+                    text: "Chest counted" + (root.who != "" ? " · " + root.who : "") + "  —  tag it?";
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                Rectangle { }
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: close-ta.has-hover ? Theme.border : transparent;
+                    T { text: "×"; width: 100%; height: 100%; horizontal-alignment: center; vertical-alignment: center; font-size: 16px; color: Theme.text-dim; }
+                    close-ta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(); } }
+                }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                for r in 6: Rectangle {
+                    height: 40px;
+                    border-radius: 8px;
+                    background: Theme.rarity-brush(r).transparentize(rt.has-hover ? 0.55 : 0.8);
+                    border-width: 1px;
+                    border-color: Theme.rarity-color(r);
+                    animate background { duration: 100ms; }
+                    T {
+                        text: Theme.rarity-name(r);
+                        width: 100%;
+                        height: 100%;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: Theme.rarity-color(r);
+                    }
+                    rt := TouchArea { mouse-cursor: pointer; clicked => { root.tag(r); } }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    height: 26px;
+                    width: 120px;
+                    border-radius: 6px;
+                    background: it-ta.has-hover ? Theme.border : Theme.surface-alt;
+                    T {
+                        text: root.expanded ? "Item  ▲" : "Item  ▼";
+                        width: 100%;
+                        height: 100%;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                    }
+                    it-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            root.expanded = !root.expanded;
+                            root.expand-changed(root.expanded);
+                        }
+                    }
+                }
+                Rectangle {
+                    // countdown bar
+                    height: 4px;
+                    y: 11px;
+                    border-radius: 2px;
+                    background: Theme.border;
+                    Rectangle {
+                        x: 0px;
+                        width: parent.width * root.progress;
+                        border-radius: 2px;
+                        background: Theme.accent-gradient;
+                    }
+                }
+            }
+            if root.expanded: ScrollBox {
+                VerticalLayout {
+                    spacing: 2px;
+                    for it in root.items: Rectangle {
+                        height: 28px;
+                        border-radius: 6px;
+                        background: ia.has-hover ? Theme.surface-alt : transparent;
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            spacing: 8px;
+                            Rectangle {
+                                width: 8px;
+                                Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.rarity-brush(it.rarity); }
+                            }
+                            T { text: it.name; vertical-alignment: center; overflow: elide; color: Theme.rarity-color(it.rarity); }
+                        }
+                        ia := TouchArea { mouse-cursor: pointer; clicked => { root.tag-item(it.name, it.rarity); } }
+                    }
+                }
+            }
+        }
+    }
+}

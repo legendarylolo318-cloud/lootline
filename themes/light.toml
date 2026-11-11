@@ -1,0 +1,32 @@
+name = "Light"
+author = "Lootline"
+dark = false
+
+[colors]
+bg = "#eef1f6"
+surface = "#ffffff"
+surface_alt = "#e4e8f0"
+border = "#cdd4e0"
+text = "#161a24"
+text_dim = "#5d667a"
+accent = "#2f6bff"
+accent_alt = "#7a4dff"
+on_accent = "#ffffff"
+good = "#1fa045"
+bad = "#e03150"
+warn = "#d98a00"
+
+[rarity]
+common = "#7d8794"
+uncommon = "#25a847"
+rare = "#1f7ae0"
+epic = "#9a3fe0"
+legendary = "#e69500"
+mythic = "#e0338a"
+mythic_alt = "#e6b800"
+
+[shape]
+radius = 14
+radius_small = 8
+font = "Segoe UI"
+glow = 0.6

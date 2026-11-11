@@ -1,0 +1,32 @@
+name = "Storm"
+author = "Lootline"
+dark = true
+
+[colors]
+bg = "#120d1f"
+surface = "#1c1530"
+surface_alt = "#271d42"
+border = "#3a2b63"
+text = "#f1ecff"
+text_dim = "#9d90c4"
+accent = "#a96bff"
+accent_alt = "#ff5fd2"
+on_accent = "#ffffff"
+good = "#4be3a0"
+bad = "#ff5b7f"
+warn = "#ffc65c"
+
+[rarity]
+common = "#a39fb8"
+uncommon = "#47e08a"
+rare = "#5aa8ff"
+epic = "#c77dff"
+legendary = "#ffb347"
+mythic = "#ff4fb8"
+mythic_alt = "#ffe066"
+
+[shape]
+radius = 16
+radius_small = 8
+font = "Segoe UI"
+glow = 1.3

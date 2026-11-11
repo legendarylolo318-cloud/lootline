@@ -1,0 +1,63 @@
+// Every colour, radius and font in the UI comes from this global. Nothing else hard-codes them.
+// Rust pushes the active theme (TOML on disk -> core::theme::Theme) into these properties.
+
+export global Theme {
+    in property <color> bg: #0e1118;
+    in property <color> surface: #161a24;
+    in property <color> surface-alt: #1e2330;
+    in property <color> border: #2a3142;
+    in property <color> text: #eef1f7;
+    in property <color> text-dim: #8c95a8;
+    in property <color> accent: #4f8cff;
+    in property <color> accent-alt: #8a5cff;
+    in property <color> on-accent: #ffffff;
+    in property <color> good: #3fd35b;
+    in property <color> bad: #ff5470;
+    in property <color> warn: #ffb62e;
+
+    in property <color> r-common: #9aa3ad;
+    in property <color> r-uncommon: #3fd35b;
+    in property <color> r-rare: #3d9bff;
+    in property <color> r-epic: #b45cff;
+    in property <color> r-legendary: #ffb62e;
+    in property <color> r-mythic: #ff4fa3;
+    in property <color> r-mythic-alt: #ffd84a;
+
+    in property <length> radius: 14px;
+    in property <length> radius-small: 8px;
+    in property <string> font: "Segoe UI";
+    /// 0 disables glow effects, 1 is the default strength.
+    in property <float> glow: 1.0;
+
+    out property <brush> mythic: @linear-gradient(90deg, r-mythic 0%, r-mythic-alt 100%);
+    out property <brush> accent-gradient: @linear-gradient(90deg, accent 0%, accent-alt 100%);
+    out property <brush> luck-gradient: @linear-gradient(90deg, bad 0%, warn 50%, good 100%);
+
+    // rarity index: 0 Common .. 5 Mythic, -1 unknown
+    pure public function rarity-color(r: int) -> color {
+        if r == 0 { return r-common; }
+        if r == 1 { return r-uncommon; }
+        if r == 2 { return r-rare; }
+        if r == 3 { return r-epic; }
+        if r == 4 { return r-legendary; }
+        if r == 5 { return r-mythic; }
+        return text-dim;
+    }
+    pure public function rarity-brush(r: int) -> brush {
+        if r == 5 { return mythic; }
+        return rarity-color(r);
+    }
+    pure public function rarity-name(r: int) -> string {
+        if r == 0 { return "Common"; }
+        if r == 1 { return "Uncommon"; }
+        if r == 2 { return "Rare"; }
+        if r == 3 { return "Epic"; }
+        if r == 4 { return "Legendary"; }
+        if r == 5 { return "Mythic"; }
+        return "Untagged";
+    }
+    pure public function luck-color(v: float) -> color {
+        if v < 0.5 { return bad.mix(warn, v * 2); }
+        return warn.mix(good, (v - 0.5) * 2);
+    }
+}

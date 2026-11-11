@@ -1,0 +1,32 @@
+[package]
+name = "lootline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "lootline"
+path = "src/main.rs"
+
+[dependencies]
+lootline-core.workspace = true
+lootline-net.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+slint = { version = "1.18", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "software-renderer-systemfonts", "raw-window-handle-06"] }
+global-hotkey = "0.10"
+arboard = { version = "3", default-features = false }
+directories = "6"
+time = { version = "0.3", features = ["local-offset", "formatting", "macros"] }
+raw-window-handle = "0.6"
+
+[target.'cfg(windows)'.dependencies]
+lootline-detect.workspace = true
+tray-icon = { version = "0.26", default-features = false }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
+[build-dependencies]
+slint-build = "1.18"

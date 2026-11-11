@@ -1,0 +1,32 @@
+name = "OLED Black"
+author = "Lootline"
+dark = true
+
+[colors]
+bg = "#000000"
+surface = "#0a0a0c"
+surface_alt = "#131318"
+border = "#23232b"
+text = "#f2f2f5"
+text_dim = "#808089"
+accent = "#00d1ff"
+accent_alt = "#7c5cff"
+on_accent = "#000000"
+good = "#3fe06b"
+bad = "#ff4d6a"
+warn = "#ffc23a"
+
+[rarity]
+common = "#9aa3ad"
+uncommon = "#3fd35b"
+rare = "#3d9bff"
+epic = "#b45cff"
+legendary = "#ffb62e"
+mythic = "#ff4fa3"
+mythic_alt = "#ffd84a"
+
+[shape]
+radius = 12
+radius_small = 8
+font = "Segoe UI"
+glow = 1.0

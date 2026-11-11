@@ -1,0 +1,276 @@
+import { Theme } from "theme.slint";
+import { Backend, ColorField, ThemeChip } from "backend.slint";
+import { T, Dim, Card, Btn, Field, Toggle, Slide, ScrollBox } from "widgets.slint";
+
+component Section inherits Card {
+    in property <string> title;
+    in property <string> hint;
+    VerticalLayout {
+        padding: 22px;
+        spacing: 12px;
+        T { text: root.title; font-size: 17px; font-weight: 800; }
+        if root.hint != "": Dim { text: root.hint; wrap: word-wrap; }
+        @children
+    }
+}
+
+component Labeled inherits HorizontalLayout {
+    in property <string> label;
+    in property <length> label-width: 170px;
+    spacing: 12px;
+    T {
+        width: root.label-width;
+        text: root.label;
+        vertical-alignment: center;
+        color: Theme.text-dim;
+    }
+    @children
+}
+
+component ColorRow inherits Rectangle {
+    in property <ColorField> f;
+    in property <bool> rarity: false;
+    height: 36px;
+    HorizontalLayout {
+        spacing: 10px;
+        Rectangle {
+            width: 28px;
+            height: 28px;
+            y: 4px;
+            border-radius: 6px;
+            background: f.value;
+            border-width: 1px;
+            border-color: Theme.border;
+        }
+        T { text: f.label; width: 110px; vertical-alignment: center; color: Theme.text-dim; }
+        Field {
+            width: 110px;
+            text: f.hex;
+            edited(t) => {
+                if root.rarity { Backend.edit-rarity(f.key, t); } else { Backend.edit-color(f.key, t); }
+            }
+        }
+    }
+}
+
+component ThemeChipView inherits Rectangle {
+    in property <ThemeChip> c;
+    callback clicked();
+    height: 64px;
+    width: 120px;
+    border-radius: Theme.radius-small;
+    background: c.bg;
+    border-width: c.active ? 2px : 1px;
+    border-color: c.active ? Theme.accent : Theme.border;
+    Rectangle {
+        x: 10px;
+        y: 10px;
+        width: parent.width - 20px;
+        height: 20px;
+        border-radius: 5px;
+        background: c.surface;
+        Rectangle {
+            x: 5px;
+            y: 5px;
+            width: 40px;
+            height: 10px;
+            border-radius: 5px;
+            background: c.accent;
+        }
+    }
+    Text {
+        x: 10px;
+        y: 38px;
+        width: parent.width - 20px;
+        text: c.name;
+        font-family: Theme.font;
+        font-size: 12px;
+        font-weight: 700;
+        color: c.accent;
+        overflow: elide;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component SettingsPage inherits Rectangle {
+    ScrollBox {
+        VerticalLayout {
+            padding: 28px;
+            spacing: 18px;
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    T { text: "Settings"; font-size: 26px; font-weight: 800; }
+                    Dim { text: Backend.settings-msg; color: Theme.good; }
+                }
+                Rectangle { }
+                Btn { text: "Save settings"; primary: true; clicked => { Backend.apply-settings(); } }
+            }
+
+            Section {
+                title: "Profile";
+                Labeled { label: "Display name"; Field { text <=> Backend.player-name; } }
+                Labeled {
+                    label: "Colour";
+                    HorizontalLayout {
+                        spacing: 8px;
+                        for c in Backend.palette: Rectangle {
+                            width: 30px;
+                            height: 30px;
+                            border-radius: 15px;
+                            background: c.value;
+                            border-width: Backend.player-color == c.hex ? 3px : 1px;
+                            border-color: Backend.player-color == c.hex ? Theme.text : Theme.border;
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { Backend.player-color = c.hex; }
+                            }
+                        }
+                        Rectangle { }
+                    }
+                }
+            }
+
+            Section {
+                title: "Chest detection";
+                hint: Backend.detection-available
+                    ? "Listens only to Fortnite's own audio (process loopback). It never touches the game process. A match only counts if your interact key was held just before the sound."
+                    : "Viewer-only mode: this build has no detection. You still see the whole party live and can add chests by hand.";
+                if Backend.detection-available: Labeled {
+                    label: "Enable detection";
+                    Toggle { checked <=> Backend.detection-enabled; }
+                    Rectangle { }
+                }
+                if Backend.detection-available: Labeled {
+                    label: "Sensitivity";
+                    Slide { value <=> Backend.sensitivity; }
+                    Dim { width: 90px; text: Backend.sensitivity < 0.34 ? "strict" : Backend.sensitivity < 0.67 ? "balanced" : "loose"; vertical-alignment: center; }
+                }
+                if Backend.detection-available: Labeled {
+                    label: "Interact key";
+                    Field { width: 110px; text <=> Backend.interact-key; }
+                    Dim { text: "key you hold to open chests (default E)"; vertical-alignment: center; }
+                }
+                Labeled {
+                    label: "Add chest hotkey";
+                    Field { width: 110px; text <=> Backend.hotkey-add; }
+                    Dim { text: "manual fallback, works while Fortnite is focused"; vertical-alignment: center; }
+                }
+                Labeled {
+                    label: "Undo hotkey";
+                    Field { width: 110px; text <=> Backend.hotkey-undo; }
+                }
+            }
+
+            if Backend.detection-available: Section {
+                title: "Sound templates";
+                hint: "Templates are the chest-open sounds the detector matches against. Fetch the latest from the repo, or record your own: start a Creative island, press Record, then open a chest or play the sound within 4 seconds.";
+                Labeled {
+                    label: "Template name";
+                    Field { width: 220px; text <=> Backend.template-name; }
+                    Btn { text: Backend.recording ? "Recording..." : "Record template"; enabled: !Backend.recording; primary: true; clicked => { Backend.record-template(); } }
+                    Btn { text: "Fetch from repo"; clicked => { Backend.fetch-templates(); } }
+                    Rectangle { }
+                }
+                Dim { text: Backend.template-status; }
+                Dim { text: Backend.templates-info; }
+            }
+
+            Section {
+                title: "Loot table & odds";
+                hint: "Loot tables (per-chest probabilities) are fetched from the repo and cached. A bundled PLACEHOLDER table with made-up values is the fallback.";
+                Labeled { label: "Season file"; Field { width: 220px; text <=> Backend.season; } }
+                Labeled { label: "Repo base URL"; Field { text <=> Backend.repo-url; } }
+                HorizontalLayout {
+                    spacing: 12px;
+                    Btn { text: "Fetch latest loot table"; clicked => { Backend.fetch-loot(); } }
+                    Dim { text: Backend.loot-status; vertical-alignment: center; }
+                }
+            }
+
+            Section {
+                title: "Rarity tagging overlay";
+                hint: "A small always-on-top window that appears after each detected chest. Pick a rarity (or an item) with one click; it hides itself after the timeout and the chest stays counted with unknown rarity. Works with Fortnite in borderless windowed mode.";
+                Labeled { label: "Show overlay"; Toggle { checked <=> Backend.overlay-enabled; } Rectangle { } }
+                Labeled {
+                    label: "Position (x, y)";
+                    Field { width: 90px; text <=> Backend.overlay-x; }
+                    Field { width: 90px; text <=> Backend.overlay-y; }
+                    Rectangle { }
+                }
+                Labeled {
+                    label: "Size (w, h)";
+                    Field { width: 90px; text <=> Backend.overlay-w; }
+                    Field { width: 90px; text <=> Backend.overlay-h; }
+                    Rectangle { }
+                }
+                Labeled {
+                    label: "Auto-hide after (s)";
+                    Field { width: 90px; text <=> Backend.overlay-timeout; }
+                    Btn { text: "Test overlay"; clicked => { Backend.test-overlay(); } }
+                    Rectangle { }
+                }
+            }
+
+            Section {
+                title: "Window";
+                Labeled { label: "Minimize to tray on close"; label-width: 230px; Toggle { checked <=> Backend.minimize-to-tray; } Rectangle { } }
+                Labeled { label: "Start minimized"; label-width: 230px; Toggle { checked <=> Backend.start-minimized; } Rectangle { } }
+            }
+
+            Section {
+                title: "Themes";
+                hint: "Themes are TOML files in your themes folder. Pick one, tweak any colour with live preview, then save it under a new name. Share a theme by exporting it and pasting the text to a friend.";
+                HorizontalLayout {
+                    spacing: 10px;
+                    for c in Backend.themes: ThemeChipView { c: c; clicked => { Backend.pick-theme(c.name); } }
+                    Rectangle { }
+                }
+                Dim { text: "INTERFACE COLOURS"; font-weight: 700; letter-spacing: 2px; }
+                GridLayout {
+                    spacing: 6px;
+                    for f[i] in Backend.color-fields: ColorRow {
+                        row: Math.floor(i / 2);
+                        col: Math.mod(i, 2);
+                        f: f;
+                    }
+                }
+                HorizontalLayout {
+                    Dim { text: "RARITY COLOURS"; font-weight: 700; letter-spacing: 2px; vertical-alignment: center; }
+                    Rectangle { }
+                    Btn { text: "Reset to defaults"; clicked => { Backend.reset-rarity(); } }
+                }
+                GridLayout {
+                    spacing: 6px;
+                    for f[i] in Backend.rarity-fields: ColorRow {
+                        row: Math.floor(i / 2);
+                        col: Math.mod(i, 2);
+                        f: f;
+                        rarity: true;
+                    }
+                }
+                Rectangle { height: 1px; background: Theme.border; }
+                Labeled {
+                    label: "Save as";
+                    label-width: 70px;
+                    Field { width: 240px; text <=> Backend.theme-name; placeholder: "My theme"; }
+                    Btn { text: "Save theme"; primary: true; clicked => { Backend.save-theme(); } }
+                    Btn { text: "Export (copy TOML)"; clicked => { Backend.export-theme(); } }
+                    Btn { text: "Open folder"; clicked => { Backend.open-themes-folder(); } }
+                    Rectangle { }
+                }
+                Labeled {
+                    label: "Import";
+                    label-width: 70px;
+                    Field { text <=> Backend.theme-import-text; placeholder: "Paste theme TOML, or a path to a .toml file"; }
+                    Btn { text: "Import"; clicked => { Backend.import-theme(); } }
+                }
+                Dim { text: Backend.theme-msg; color: Theme.accent; }
+            }
+            Rectangle { height: 20px; }
+        }
+    }
+}

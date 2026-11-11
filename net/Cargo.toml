@@ -1,0 +1,18 @@
+[package]
+name = "lootline-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lootline-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+iroh = "1"
+
+[dev-dependencies]
+iroh = "1"
+uuid.workspace = true

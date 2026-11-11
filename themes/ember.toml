@@ -1,0 +1,32 @@
+name = "Ember"
+author = "Lootline"
+dark = true
+
+[colors]
+bg = "#150d0b"
+surface = "#201411"
+surface_alt = "#2c1c17"
+border = "#43291f"
+text = "#fff1ea"
+text_dim = "#b8998c"
+accent = "#ff7a2f"
+accent_alt = "#ffb02e"
+on_accent = "#1a0c05"
+good = "#7ddc5a"
+bad = "#ff4d4d"
+warn = "#ffc23a"
+
+[rarity]
+common = "#9aa3ad"
+uncommon = "#3fd35b"
+rare = "#3d9bff"
+epic = "#b45cff"
+legendary = "#ffb62e"
+mythic = "#ff4fa3"
+mythic_alt = "#ffd84a"
+
+[shape]
+radius = 14
+radius_small = 8
+font = "Segoe UI"
+glow = 1.2

@@ -1,0 +1,164 @@
+import { Theme } from "theme.slint";
+import { Backend, HistRow, StatRow, BarDatum } from "backend.slint";
+import { T, Dim, Card, ScrollBox } from "widgets.slint";
+
+component HistItem inherits Rectangle {
+    in property <HistRow> r;
+    callback clicked();
+    height: r.is-header ? 34px : 52px;
+    border-radius: Theme.radius-small;
+    background: r.selected ? Theme.accent.transparentize(0.82) : (ta.has-hover ? Theme.surface-alt : transparent);
+    border-width: r.selected ? 1px : 0px;
+    border-color: Theme.accent.transparentize(0.4);
+    if r.is-header: Dim {
+        x: 12px;
+        width: parent.width - 24px;
+        height: parent.height;
+        vertical-alignment: bottom;
+        text: r.title;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+    }
+    if !r.is-header: HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            T { text: r.title; font-weight: 600; overflow: elide; }
+            Dim { text: r.sub; font-size: 11px; overflow: elide; }
+        }
+        T {
+            width: 50px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            text: "\{r.count}";
+            font-size: 20px;
+            font-weight: 800;
+            color: Theme.accent;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component Bars inherits Rectangle {
+    in property <[BarDatum]> data;
+    VerticalLayout {
+        spacing: 8px;
+        for d in root.data: HorizontalLayout {
+            height: 24px;
+            spacing: 10px;
+            Dim { width: 78px; text: d.label; vertical-alignment: center; }
+            Rectangle {
+                height: 14px;
+                y: 5px;
+                border-radius: 7px;
+                background: Theme.surface-alt;
+                Rectangle {
+                    x: 0px;
+                    width: Math.max(d.value > 0 ? 14px : 0px, parent.width * d.frac);
+                    border-radius: 7px;
+                    background: Theme.rarity-brush(d.rarity);
+                    animate width { duration: 400ms; easing: ease-out; }
+                }
+            }
+            T { width: 40px; text: "\{d.value}"; horizontal-alignment: right; vertical-alignment: center; font-weight: 700; }
+        }
+    }
+}
+
+component PlayerBars inherits Rectangle {
+    in property <[StatRow]> data;
+    VerticalLayout {
+        spacing: 10px;
+        for d in root.data: HorizontalLayout {
+            height: 26px;
+            spacing: 10px;
+            Rectangle {
+                width: 10px;
+                Rectangle { width: 10px; height: 10px; border-radius: 5px; background: d.color; }
+            }
+            T { width: 120px; text: d.name; overflow: elide; vertical-alignment: center; }
+            Rectangle {
+                height: 14px;
+                y: 6px;
+                border-radius: 7px;
+                background: Theme.surface-alt;
+                Rectangle {
+                    x: 0px;
+                    width: Math.max(d.count > 0 ? 14px : 0px, parent.width * d.frac);
+                    border-radius: 7px;
+                    background: d.color;
+                    animate width { duration: 400ms; easing: ease-out; }
+                }
+            }
+            T { width: 44px; text: "\{d.count}"; horizontal-alignment: right; vertical-alignment: center; font-weight: 700; }
+            Dim { width: 90px; text: "\{d.lifetime} lifetime"; vertical-alignment: center; horizontal-alignment: right; font-size: 11px; }
+        }
+    }
+}
+
+export component HistoryPage inherits Rectangle {
+    HorizontalLayout {
+        padding: 28px;
+        spacing: 18px;
+        Card {
+            width: 340px;
+            VerticalLayout {
+                padding: 14px;
+                spacing: 4px;
+                T { text: "History"; font-size: 22px; font-weight: 800; x: 8px; }
+                Dim { text: "Sessions and matches"; }
+                Rectangle { height: 6px; }
+                ScrollBox {
+                    VerticalLayout {
+                        spacing: 4px;
+                        for r in Backend.history: HistItem { r: r; clicked => { Backend.select-history(r.id); } }
+                        if Backend.history.length == 0: Dim { text: "No sessions yet."; }
+                    }
+                }
+            }
+        }
+        ScrollBox {
+            horizontal-stretch: 1;
+            VerticalLayout {
+                spacing: 18px;
+                Card {
+                    VerticalLayout {
+                        padding: 22px;
+                        spacing: 14px;
+                        T { text: Backend.hist-title; font-size: 18px; font-weight: 800; }
+                        Dim { text: "RARITY DISTRIBUTION"; font-weight: 700; letter-spacing: 2px; }
+                        Bars { data: Backend.hist-bars; }
+                    }
+                }
+                Card {
+                    VerticalLayout {
+                        padding: 22px;
+                        spacing: 14px;
+                        Dim { text: "PER PLAYER"; font-weight: 700; letter-spacing: 2px; }
+                        PlayerBars { data: Backend.hist-players; }
+                        if Backend.hist-players.length == 0: Dim { text: "No chests recorded here."; }
+                    }
+                }
+                Card {
+                    VerticalLayout {
+                        padding: 22px;
+                        spacing: 14px;
+                        HorizontalLayout {
+                            Dim { text: "LIFETIME"; font-weight: 700; letter-spacing: 2px; }
+                            Rectangle { }
+                            T { text: "\{Backend.lifetime-total} chests"; font-weight: 800; color: Theme.accent; }
+                        }
+                        Bars { data: Backend.lifetime-bars; }
+                        Rectangle { height: 1px; background: Theme.border; }
+                        PlayerBars { data: Backend.lifetime-players; }
+                    }
+                }
+            }
+        }
+    }
+}

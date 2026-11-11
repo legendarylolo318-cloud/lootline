@@ -1,0 +1,32 @@
+name = "Dark"
+author = "Lootline"
+dark = true
+
+[colors]
+bg = "#0e1118"
+surface = "#161a24"
+surface_alt = "#1e2330"
+border = "#2a3142"
+text = "#eef1f7"
+text_dim = "#8c95a8"
+accent = "#4f8cff"
+accent_alt = "#8a5cff"
+on_accent = "#ffffff"
+good = "#3fd35b"
+bad = "#ff5470"
+warn = "#ffb62e"
+
+[rarity]
+common = "#9aa3ad"
+uncommon = "#3fd35b"
+rare = "#3d9bff"
+epic = "#b45cff"
+legendary = "#ffb62e"
+mythic = "#ff4fa3"
+mythic_alt = "#ffd84a"
+
+[shape]
+radius = 14
+radius_small = 8
+font = "Segoe UI"
+glow = 1.0

@@ -1,0 +1,42 @@
+{
+  "season": "placeholder",
+  "placeholder": false,
+  "note": "Per-chest rates (1 in N) from a public odds page citing Epic's Fortnite Status post of Nov 7, 2026, supplied by the project owner. Verify before relying on them. Audio cannot see what a chest contained, so finds are tagged by hand.",
+  "items": [
+    {
+      "name": "Weekly Gold Outfit",
+      "rarity": "Mythic",
+      "p": 6.4e-07
+    },
+    {
+      "name": "Pirate Shop Access (Pirate Token)",
+      "rarity": "Mythic",
+      "p": 7.272727272727272e-06
+    },
+    {
+      "name": "Weekly Vehicle & Decal",
+      "rarity": "Legendary",
+      "p": 0.00012799180852425445
+    },
+    {
+      "name": "Weekly Pickaxe or Back Bling",
+      "rarity": "Epic",
+      "p": 0.0017605633802816902
+    },
+    {
+      "name": "Weekly Jam Track",
+      "rarity": "Rare",
+      "p": 0.0025575447570332483
+    },
+    {
+      "name": "Weekly Loading Screen",
+      "rarity": "Uncommon",
+      "p": 0.003676470588235294
+    },
+    {
+      "name": "Gizmo (any)",
+      "rarity": "Common",
+      "p": 0.007874015748031496
+    }
+  ]
+}

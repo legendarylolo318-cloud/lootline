@@ -1,0 +1,147 @@
+import { Theme } from "theme.slint";
+import { Backend } from "backend.slint";
+import { T, Dim, Icon, Btn } from "widgets.slint";
+import { DashboardPage } from "dashboard.slint";
+import { OddsPage } from "odds.slint";
+import { HistoryPage } from "history.slint";
+import { PartyPage } from "party.slint";
+import { SettingsPage } from "settings.slint";
+
+export { Theme, Backend }
+export { PlayerRow, FeedRow, OddsRow, HistRow, StatRow, BarDatum, ThemeChip, ColorField, ItemRow } from "backend.slint";
+export { OverlayWindow } from "overlay.slint";
+
+component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <int> icon;
+    in property <int> index;
+    height: 44px;
+    border-radius: Theme.radius-small;
+    background: Backend.page == root.index ? Theme.accent.transparentize(0.84) : (ta.has-hover ? Theme.surface-alt : transparent);
+    animate background { duration: 140ms; }
+    Rectangle {
+        x: 0px;
+        y: 10px;
+        width: 3px;
+        height: parent.height - 20px;
+        border-radius: 2px;
+        background: Theme.accent;
+        opacity: Backend.page == root.index ? 1.0 : 0.0;
+        animate opacity { duration: 140ms; }
+    }
+    HorizontalLayout {
+        padding-left: 16px;
+        spacing: 12px;
+        Rectangle {
+            width: 20px;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                kind: root.icon;
+                tint: Backend.page == root.index ? Theme.accent : Theme.text-dim;
+            }
+        }
+        T {
+            text: root.label;
+            vertical-alignment: center;
+            font-weight: 600;
+            color: Backend.page == root.index ? Theme.text : Theme.text-dim;
+        }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { Backend.page = root.index; }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Lootline";
+    min-width: 1000px;
+    min-height: 680px;
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    background: Theme.bg;
+    default-font-family: Theme.font;
+
+    HorizontalLayout {
+        // ---------------- sidebar
+        Rectangle {
+            width: 232px;
+            background: Theme.surface;
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                background: Theme.border;
+            }
+            VerticalLayout {
+                padding: 18px;
+                spacing: 6px;
+                VerticalLayout {
+                    height: 64px;
+                    padding-left: 6px;
+                    padding-top: 6px;
+                    spacing: 8px;
+                    alignment: start;
+                    T {
+                        text: "LOOTLINE";
+                        font-size: 22px;
+                        font-weight: 900;
+                        letter-spacing: 3px;
+                    }
+                    Rectangle {
+                        height: 4px;
+                        width: 70px;
+                        border-radius: 2px;
+                        background: Theme.accent-gradient;
+                    }
+                }
+                NavItem { label: "Dashboard"; icon: 0; index: 0; }
+                NavItem { label: "Odds"; icon: 1; index: 1; }
+                NavItem { label: "History"; icon: 2; index: 2; }
+                NavItem { label: "Party"; icon: 3; index: 3; }
+                NavItem { label: "Settings"; icon: 4; index: 4; }
+                Rectangle { }
+                Rectangle {
+                    height: 76px;
+                    border-radius: Theme.radius-small;
+                    background: Theme.surface-alt;
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 2px;
+                        Dim { text: "PARTY TOTAL"; font-weight: 700; letter-spacing: 2px; font-size: 10px; }
+                        T { text: "\{Backend.party-chests}"; font-size: 26px; font-weight: 800; color: Theme.accent; }
+                    }
+                }
+                Btn { text: "Hide to tray"; clicked => { Backend.hide-to-tray(); } }
+                Dim { text: "v" + Backend.version; horizontal-alignment: center; font-size: 10px; }
+            }
+        }
+        // ---------------- pages
+        Rectangle {
+            if Backend.page == 0: DashboardPage { }
+            if Backend.page == 1: OddsPage { }
+            if Backend.page == 2: HistoryPage { }
+            if Backend.page == 3: PartyPage { }
+            if Backend.page == 4: SettingsPage { }
+
+            // toast
+            if Backend.toast != "": Rectangle {
+                y: parent.height - 70px;
+                x: (parent.width - self.width) / 2;
+                width: toast-text.preferred-width + 40px;
+                height: 40px;
+                border-radius: 20px;
+                background: Theme.surface-alt;
+                border-width: 1px;
+                border-color: Theme.accent;
+                toast-text := T {
+                    width: 100%;
+                    height: 100%;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    text: Backend.toast;
+                    font-weight: 600;
+                }
+            }
+        }
+    }
+}
