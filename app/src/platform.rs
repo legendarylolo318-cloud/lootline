@@ -61,6 +61,7 @@ pub fn fit_to_work_area(w: &slint::Window) {
 #[cfg(not(windows))]
 pub fn fit_to_work_area(_w: &slint::Window) {}
 
+#[cfg_attr(not(windows), allow(dead_code))]
 /// New (x, y, w, h) inside an `area_w` x `area_h` area if `cur` doesn't fit, else None.
 pub fn fit(cur: slint::LogicalSize, area_w: f32, area_h: f32) -> Option<(f32, f32, f32, f32)> {
     if cur.width <= area_w && cur.height <= area_h {
