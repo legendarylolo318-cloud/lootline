@@ -116,6 +116,18 @@ pub fn next_host(members: &[String], old_host: &str) -> Option<String> {
     members.iter().find(|m| m.as_str() != old_host).cloned()
 }
 
+/// A member dialed us while we, too, have lost the host: should we become host right away?
+/// True when the handoff rule (first live member other than the old host) picks us.
+pub fn should_take_over(
+    members: &[String],
+    dead: &std::collections::HashSet<String>,
+    old_host: &str,
+    me: &str,
+) -> bool {
+    let alive: Vec<String> = members.iter().filter(|m| !dead.contains(*m)).cloned().collect();
+    next_host(&alive, old_host).as_deref() == Some(me)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,6 +181,18 @@ mod tests {
         let evs: Vec<Event> = (0..(EVENTS_PER_MSG * 2 + 5) as i64).map(|i| Event::new_chest("a", i, m)).collect();
         let msgs = event_msgs(evs);
         assert_eq!(msgs.len(), 3);
+    }
+
+    #[test]
+    fn early_dialer_makes_the_next_host_take_over() {
+        use std::collections::HashSet;
+        let m: Vec<String> = ["host", "b", "c"].iter().map(|s| s.to_string()).collect();
+        let none = HashSet::new();
+        assert!(should_take_over(&m, &none, "host", "b"));
+        assert!(!should_take_over(&m, &none, "host", "c"), "c is not next in line");
+        // b already found unreachable: c is next
+        let dead: HashSet<String> = ["b".to_string()].into_iter().collect();
+        assert!(should_take_over(&m, &dead, "host", "c"));
     }
 
     #[test]

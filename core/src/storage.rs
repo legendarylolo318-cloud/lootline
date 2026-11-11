@@ -25,24 +25,33 @@ pub struct MatchRow {
     pub started: i64,
 }
 
-const SCHEMA: &str = "
-CREATE TABLE IF NOT EXISTS events (
-    id   TEXT PRIMARY KEY,
-    ts   INTEGER NOT NULL,
-    json TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
-CREATE TABLE IF NOT EXISTS sessions (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    started INTEGER NOT NULL,
-    ended   INTEGER
-);
-CREATE TABLE IF NOT EXISTS matches (
-    id         TEXT PRIMARY KEY,
-    session_id INTEGER NOT NULL,
-    started    INTEGER NOT NULL
-);
-";
+/// Schema migrations, applied in order. `PRAGMA user_version` records how many have run, so
+/// each runs exactly once per database. Never edit a shipped entry: append a new one.
+const MIGRATIONS: &[&str] = &[
+    // 1: initial schema (CREATE IF NOT EXISTS, so pre-versioning databases adopt it cleanly)
+    "
+    CREATE TABLE IF NOT EXISTS events (
+        id   TEXT PRIMARY KEY,
+        ts   INTEGER NOT NULL,
+        json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
+    CREATE TABLE IF NOT EXISTS sessions (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        started INTEGER NOT NULL,
+        ended   INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS matches (
+        id         TEXT PRIMARY KEY,
+        session_id INTEGER NOT NULL,
+        started    INTEGER NOT NULL
+    );
+    ",
+    // 2: history page looks matches up by session
+    "CREATE INDEX IF NOT EXISTS matches_session ON matches(session_id, started);",
+];
+
+pub const SCHEMA_VERSION: i64 = MIGRATIONS.len() as i64;
 
 impl Storage {
     pub fn open(path: &Path) -> Result<Storage> {
@@ -56,10 +65,33 @@ impl Storage {
         Self::init(Connection::open_in_memory()?)
     }
 
-    fn init(conn: Connection) -> Result<Storage> {
+    fn init(mut conn: Connection) -> Result<Storage> {
+        // A second Lootline instance (or a backup tool) holding the file must not make writes
+        // fail instantly with SQLITE_BUSY: wait up to 5 s for the lock instead.
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
-        conn.execute_batch(SCHEMA)?;
+        Self::migrate(&mut conn)?;
         Ok(Storage { conn })
+    }
+
+    fn migrate(conn: &mut Connection) -> Result<()> {
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        anyhow::ensure!(
+            version <= SCHEMA_VERSION,
+            "database schema v{version} is newer than this Lootline (v{SCHEMA_VERSION}); update the app"
+        );
+        for (i, sql) in MIGRATIONS.iter().enumerate().skip(version.max(0) as usize) {
+            // each step and its version bump commit together, or not at all
+            let tx = conn.transaction()?;
+            tx.execute_batch(sql)?;
+            tx.pragma_update(None, "user_version", (i + 1) as i64)?;
+            tx.commit()?;
+        }
+        Ok(())
+    }
+
+    pub fn schema_version(&self) -> Result<i64> {
+        Ok(self.conn.query_row("PRAGMA user_version", [], |r| r.get(0))?)
     }
 
     /// Persist an event; returns false if it already existed.
@@ -194,6 +226,46 @@ mod tests {
         let ms = s.matches().unwrap();
         assert_eq!(ms.len(), 1);
         assert_eq!(ms[0].id, m);
+    }
+
+    #[test]
+    fn migrations_run_once_and_upgrade_old_databases() {
+        let dir = std::env::temp_dir().join(format!("lootline-mig-{}", Uuid::new_v4()));
+        let p = dir.join("l.db");
+        std::fs::create_dir_all(&dir).unwrap();
+        {
+            // a database written by the pre-versioning build: tables exist, user_version = 0
+            let c = Connection::open(&p).unwrap();
+            c.execute_batch(MIGRATIONS[0]).unwrap();
+            c.execute("INSERT INTO events (id, ts, json) VALUES ('x', 1, '{}')", []).unwrap();
+        }
+        let s = Storage::open(&p).unwrap();
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        drop(s);
+        let s = Storage::open(&p).unwrap(); // re-open: nothing re-runs, data kept
+        assert_eq!(s.schema_version().unwrap(), SCHEMA_VERSION);
+        let n: i64 = s.conn.query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0)).unwrap();
+        assert_eq!(n, 1);
+        drop(s);
+        {
+            let c = Connection::open(&p).unwrap();
+            c.pragma_update(None, "user_version", SCHEMA_VERSION + 1).unwrap();
+        }
+        assert!(Storage::open(&p).is_err(), "a newer schema must be refused, not clobbered");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn two_connections_share_the_file() {
+        let dir = std::env::temp_dir().join(format!("lootline-lock-{}", Uuid::new_v4()));
+        let p = dir.join("l.db");
+        let a = Storage::open(&p).unwrap();
+        let mut b = Storage::open(&p).unwrap();
+        a.insert_event(&Event::new_chest("a", 1, Uuid::new_v4())).unwrap();
+        b.insert_events(&[Event::new_chest("b", 2, Uuid::new_v4())]).unwrap();
+        assert_eq!(a.load_log().unwrap().len(), 2);
+        drop((a, b));
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

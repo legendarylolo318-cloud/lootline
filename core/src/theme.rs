@@ -169,6 +169,17 @@ impl Theme {
         ] {
             anyhow::ensure!(parse_color(v).is_some(), "colour '{n}' is not a valid #rrggbb[aa] value: {v}");
         }
+        let sh = &self.shape;
+        for (n, v, max) in
+            [("radius", sh.radius, 64.0), ("radius_small", sh.radius_small, 32.0), ("glow", sh.glow, 2.0)]
+        {
+            anyhow::ensure!(v.is_finite() && (0.0..=max).contains(&v), "shape.{n} = {v} is outside 0..={max}");
+        }
+        anyhow::ensure!(
+            !sh.font.trim().is_empty() && sh.font.len() <= 64,
+            "shape.font must be a font family name (1-64 characters)"
+        );
+        anyhow::ensure!(self.name.chars().count() <= 48, "theme name is longer than 48 characters");
         Ok(())
     }
 }
@@ -274,6 +285,38 @@ mod tests {
         let mut t = builtin_themes().remove(0);
         t.name = " ".into();
         assert!(t.validate().is_err());
+    }
+
+    #[test]
+    fn invalid_theme_files_fail_gracefully() {
+        let good = builtin_themes().remove(0).to_toml();
+        assert!(good.contains("radius = 14") && good.contains("glow = 1.0"), "{good}");
+        for (bad, why) in [
+            (good.replace("radius = 14", "radius = nan"), "NaN radius"),
+            (good.replace("radius = 14", "radius = -3"), "negative radius"),
+            (good.replace("glow = 1.0", "glow = 99.0"), "huge glow"),
+            (good.replace(r#"font = "Segoe UI""#, r#"font = """#), "empty font"),
+            (good.replace("[colors]", "[colours]"), "missing colours table"),
+            (String::new(), "empty file"),
+            ("\u{0}\u{1}binary".to_string(), "binary junk"),
+        ] {
+            assert!(Theme::parse(&bad).is_err(), "{why} should be rejected");
+        }
+        // a directory with only broken files still yields usable (built-in) themes
+        let dir = std::env::temp_dir().join(format!("lootline-badthemes-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("broken.toml"), "name = 3").unwrap();
+        let (themes, errors) = load_dir(&dir);
+        assert_eq!(themes, builtin_themes());
+        assert_eq!(errors.len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn export_import_roundtrip_of_every_builtin() {
+        for t in builtin_themes() {
+            assert_eq!(Theme::parse(&t.to_toml()).unwrap(), t, "{}", t.name);
+        }
     }
 
     #[test]

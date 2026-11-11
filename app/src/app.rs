@@ -66,6 +66,9 @@ pub struct App {
     pub detect_ok: bool,
     #[cfg(windows)]
     pub detector: Option<lootline_detect::DetectorHandle>,
+    /// PID of the Fortnite process the detector last attached to.
+    #[cfg(windows)]
+    pub game_pid: Option<u32>,
     pub templates: Vec<TemplateFile>,
     pub overlay_chest: Option<Uuid>,
     pub overlay_timer: Timer,
@@ -217,9 +220,15 @@ impl App {
             name: self.settings.player_name.clone(),
             color: self.settings.player_color.clone(),
             detecting,
-            ts: now_ms(),
+            ts: self.membership_ts(&self.me),
         };
         self.commit(ev);
+    }
+
+    /// Wall-clock time, but never earlier than this player's last membership event (clock skew).
+    fn membership_ts(&self, player: &str) -> i64 {
+        let now = now_ms();
+        self.log.lock().map(|l| l.next_membership_ts(player, now)).unwrap_or(now)
     }
 
     // ------------------------------------------------------------ party
@@ -236,7 +245,7 @@ impl App {
     }
 
     pub fn leave_party(&mut self) {
-        let ev = Event::Leave { id: Uuid::new_v4(), player: self.me.clone(), ts: now_ms() };
+        let ev = Event::Leave { id: Uuid::new_v4(), player: self.me.clone(), ts: self.membership_ts(&self.me) };
         self.commit(ev);
         // let the Leave event flush before the connection closes
         self.leave_timer.start(TimerMode::SingleShot, Duration::from_millis(350), || {
@@ -250,7 +259,7 @@ impl App {
     }
 
     pub fn kick(&mut self, player: &str) {
-        let ev = Event::Leave { id: Uuid::new_v4(), player: player.to_string(), ts: now_ms() };
+        let ev = Event::Leave { id: Uuid::new_v4(), player: player.to_string(), ts: self.membership_ts(player) };
         self.commit(ev);
         self.net.send(NetCmd::Kick(player.to_string()));
     }
@@ -304,10 +313,19 @@ impl App {
                 self.detect_status = "Waiting for Fortnite".into();
                 self.detect_ok = false;
             }
-            D::Status(Status::Attached { .. }) => {
+            D::Status(Status::Attached { pid }) => {
                 self.detect_status = "Listening to Fortnite".into();
                 self.detect_ok = true;
-                self.start_match();
+                // A fresh game process starts a new match; re-attaching to the same process
+                // (after an audio-device error or a detection toggle) must not split the match.
+                if self.game_pid != Some(pid) {
+                    self.game_pid = Some(pid);
+                    self.start_match();
+                }
+            }
+            D::Status(Status::Paused) => {
+                self.detect_status = "Detection off".into();
+                self.detect_ok = false;
             }
             D::Status(Status::Error(e)) => {
                 self.detect_status = format!("Audio error: {e}");
@@ -401,6 +419,7 @@ impl App {
 
         #[cfg(windows)]
         if let Some(d) = &self.detector {
+            d.send(lootline_detect::Command::SetEnabled(self.settings.detection_enabled));
             d.send(lootline_detect::Command::SetSensitivity(self.settings.sensitivity));
             d.send(lootline_detect::Command::SetInteractKey(self.settings.interact_key.clone()));
         }
@@ -567,18 +586,6 @@ pub fn sanitize(name: &str) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::sanitize;
-
-    #[test]
-    fn sanitizes_file_names() {
-        assert_eq!(sanitize("My Theme!"), "My-Theme");
-        assert_eq!(sanitize("../../evil"), "evil");
-        assert_eq!(sanitize("???"), "untitled");
-    }
-}
-
 impl App {
     /// Developer aid (`LOOTLINE_DEMO=1`): fill an in-memory log with a fake party so every page
     /// can be inspected. Never touches the real database.
@@ -646,5 +653,17 @@ impl App {
             l.insert(e.clone());
         }
         let _ = self.db.insert_event(&e);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize;
+
+    #[test]
+    fn sanitizes_file_names() {
+        assert_eq!(sanitize("My Theme!"), "My-Theme");
+        assert_eq!(sanitize("../../evil"), "evil");
+        assert_eq!(sanitize("???"), "untitled");
     }
 }

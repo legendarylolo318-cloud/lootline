@@ -216,6 +216,10 @@ impl TemplateFile {
         ensure!(self.frames.len() >= 6, "template too short");
         ensure!(self.frames.len() <= 400, "template too long");
         ensure!(self.frames.iter().all(|f| f.len() == N_MELS), "ragged template");
+        ensure!(
+            self.frames.iter().flatten().all(|v| v.is_finite() && v.abs() < 1e4),
+            "template contains non-finite or absurd values"
+        );
         Ok(())
     }
 }
@@ -557,5 +561,8 @@ mod tests {
         let mut short = t;
         short.frames.truncate(2);
         assert!(short.validate().is_err());
+        let mut nan = make_template();
+        nan.frames[3][5] = f32::NAN;
+        assert!(nan.validate().is_err(), "a NaN would poison every correlation score");
     }
 }

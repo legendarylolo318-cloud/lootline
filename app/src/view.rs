@@ -50,6 +50,8 @@ macro_rules! apply_theme {
     }};
 }
 
+/// Player identity colours offered in Settings (what friends see next to your name). These are
+/// per-player data shared over the network, deliberately independent of anyone's theme.
 const PALETTE: [&str; 10] =
     ["#4f8cff", "#ff5470", "#3fd35b", "#ffb62e", "#b45cff", "#00d1ff", "#ff7a2f", "#ff4fa3", "#9aa3ad", "#e8e8e8"];
 
@@ -77,13 +79,23 @@ fn odds_ui(r: &OddsRow) -> UiOddsRow {
         rarity: r.rarity.index() as i32,
         is_group: r.is_rarity_row,
         p: fmt_pct(s.p).into(),
-        expected: format!("{:.2}", s.expected).into(),
+        expected: if s.expected == 0.0 || s.expected >= 0.01 {
+            format!("{:.2}", s.expected)
+        } else {
+            lootline_core::odds::fmt::num(s.expected)
+        }
+        .into(),
         got: s.got as i32,
         p1: fmt_pct(s.p_at_least_one).into(),
         luck: s.luck as f32,
         luck_text: fmt_pct(s.luck).into(),
         dry: fmt_pct(s.dry).into(),
-        tip_p: format!("p = per-chest probability from the loot table = {:.4}", s.p).into(),
+        tip_p: format!(
+            "p = per-chest probability from the loot table = {} (1 in {})",
+            lootline_core::odds::fmt::num(s.p),
+            if s.p > 0.0 { lootline_core::odds::fmt::num((1.0 / s.p).round()) } else { "∞".into() }
+        )
+        .into(),
         tip_expected: formula::expected(s.n, s.p, s.expected).into(),
         tip_p1: formula::at_least_one(s.n, s.p, s.p_at_least_one).into(),
         tip_luck: formula::luck(s.n, s.p, s.got, s.luck).into(),
@@ -128,6 +140,15 @@ fn bars(chests: &[&Chest]) -> Vec<BarDatum> {
 }
 
 impl App {
+    /// A player's chosen colour (it is identity data, not theme data), falling back to the
+    /// theme's dim text colour for unknown players or invalid colours received from peers.
+    fn player_color(&self, p: Option<&PlayerInfo>) -> slint::Color {
+        match p.map(|p| p.color.as_str()).filter(|c| lootline_core::theme::parse_color(c).is_some()) {
+            Some(c) => color(c),
+            None => color(&self.theme.colors.text_dim),
+        }
+    }
+
     fn party_ids(&self) -> HashSet<String> {
         let mut s: HashSet<String> = HashSet::new();
         s.insert(self.me.clone());
@@ -152,18 +173,37 @@ impl App {
             .iter()
             .map(|(id, n)| StatRow {
                 name: info.get(*id).map(|p| p.name.clone()).unwrap_or_else(|| short_id(id)).into(),
-                color: color(info.get(*id).map(|p| p.color.as_str()).unwrap_or("#9aa3ad")),
+                color: self.player_color(info.get(*id)),
                 count: *n as i32,
                 lifetime: lifetime.get(*id).copied().unwrap_or(0) as i32,
                 frac: *n as f32 / max,
             })
             .collect();
-        v.sort_by(|a, b| b.count.cmp(&a.count));
+        v.sort_by_key(|r| std::cmp::Reverse(r.count));
         v
+    }
+
+    /// While the window is hidden (in the tray) only the tray tooltip is updated: rebuilding
+    /// every model would cost CPU for nothing. `show_main` refreshes fully when it reappears.
+    #[cfg(windows)]
+    fn refresh_tray_only(&self) {
+        let Some(t) = &self.tray else { return };
+        let Ok(chests) = self.log.lock().map(|l| l.chests()) else { return };
+        let ctx = ScopeCtx { me: &self.me, match_start: self.match_start, session_start: self.session_start };
+        let party_ids = self.party_ids();
+        let scoped = stats::select(&chests, self.scope, Who::Party, &ctx);
+        let party = scoped.iter().filter(|c| party_ids.contains(&c.player)).count();
+        let mine = scoped.iter().filter(|c| c.player == self.me).count();
+        t.set_count(mine, party);
     }
 
     pub fn refresh(&mut self) {
         let Some(ui) = self.ui.upgrade() else { return };
+        #[cfg(windows)]
+        if !ui.window().is_visible() {
+            self.refresh_tray_only();
+            return;
+        }
         let b = ui.global::<Backend>();
         let (chests, players) = match self.log.lock() {
             Ok(l) => (l.chests(), l.players()),
@@ -191,7 +231,7 @@ impl App {
             if tagged == 0 {
                 "open some chests to see your luck".into()
             } else {
-                format!("{tagged} chests · {:.0}th percentile", luck * 100.0)
+                format!("{tagged} chests · {} percentile", ordinal((luck * 100.0).round() as u32))
             }
             .into(),
         );
@@ -234,7 +274,7 @@ impl App {
             .take(24)
             .map(|c| FeedRow {
                 who: info.get(&c.player).map(|p| p.name.clone()).unwrap_or_else(|| short_id(&c.player)).into(),
-                who_color: color(info.get(&c.player).map(|p| p.color.as_str()).unwrap_or("#9aa3ad")),
+                who_color: self.player_color(info.get(&c.player)),
                 rarity: ridx(c.rarity),
                 item: c.item.clone().unwrap_or_default().into(),
                 time: fmt_ago(now, c.ts).into(),
@@ -273,7 +313,7 @@ impl App {
                         .unwrap_or_else(|| "?".into())
                         .into(),
                     name: name.into(),
-                    color: color(pi.map(|p| p.color.as_str()).unwrap_or("#9aa3ad")),
+                    color: self.player_color(pi),
                     chests: counts.get(id.as_str()).copied().unwrap_or(0),
                     connected: *connected,
                     detecting: pi.is_some_and(|p| p.detecting),

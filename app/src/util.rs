@@ -50,12 +50,8 @@ impl Paths {
 
 /// A stable 32-byte secret key (the player's identity), created on first run.
 pub fn load_or_create_identity(path: &std::path::Path) -> [u8; 32] {
-    if let Ok(s) = std::fs::read_to_string(path) {
-        let hex: Vec<u8> =
-            (0..s.trim().len() / 2).filter_map(|i| u8::from_str_radix(&s.trim()[i * 2..i * 2 + 2], 16).ok()).collect();
-        if let Ok(k) = <[u8; 32]>::try_from(hex.as_slice()) {
-            return k;
-        }
+    if let Some(k) = std::fs::read_to_string(path).ok().and_then(|s| parse_hex32(s.trim())) {
+        return k;
     }
     let mut k = [0u8; 32];
     k[..16].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
@@ -63,6 +59,21 @@ pub fn load_or_create_identity(path: &std::path::Path) -> [u8; 32] {
     let hex: String = k.iter().map(|b| format!("{b:02x}")).collect();
     let _ = std::fs::write(path, hex);
     k
+}
+
+/// Exactly 64 hex digits -> 32 bytes. Works on bytes, so a corrupt (non-ASCII) file can never
+/// panic on a char boundary.
+fn parse_hex32(s: &str) -> Option<[u8; 32]> {
+    let b = s.as_bytes();
+    if b.len() != 64 {
+        return None;
+    }
+    let nib = |c: u8| (c as char).to_digit(16).map(|v| v as u8);
+    let mut out = [0u8; 32];
+    for (i, o) in out.iter_mut().enumerate() {
+        *o = nib(b[2 * i])? << 4 | nib(b[2 * i + 1])?;
+    }
+    Some(out)
 }
 
 fn local_offset() -> UtcOffset {
@@ -100,7 +111,7 @@ fn thousands(n: u64) -> String {
     let s = n.to_string();
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             out.push(',');
         }
         out.push(c);
@@ -109,10 +120,17 @@ fn thousands(n: u64) -> String {
 }
 
 pub fn fmt_pct(v: f64) -> String {
+    if !v.is_finite() {
+        return "–".into();
+    }
     let p = v * 100.0;
     if v > 0.0 && v < 0.0001 {
         // too small for a percentage to be readable: show "1 in N"
         return format!("1 in {}", thousands((1.0 / v).round() as u64));
+    }
+    if v < 1.0 && p >= 99.95 {
+        // never round "almost certain" up to a flat 100%
+        return ">99.9%".into();
     }
     if p >= 10.0 {
         format!("{p:.0}%")
@@ -123,8 +141,21 @@ pub fn fmt_pct(v: f64) -> String {
     }
 }
 
+/// 1 -> "1st", 2 -> "2nd", 11 -> "11th", 23 -> "23rd"
+pub fn ordinal(n: u32) -> String {
+    let suffix = match (n % 10, n % 100) {
+        (_, 11..=13) => "th",
+        (1, _) => "st",
+        (2, _) => "nd",
+        (3, _) => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
+}
+
 pub fn short_id(id: &str) -> String {
-    format!("player-{}", &id[..id.len().min(5)])
+    // ids come from peers: never slice by bytes
+    format!("player-{}", id.chars().take(5).collect::<String>())
 }
 
 #[cfg(test)]
@@ -145,6 +176,34 @@ mod tests {
         assert_eq!(fmt_pct(0.052), "5.2%");
         assert_eq!(fmt_pct(0.005), "0.50%");
         assert_eq!(fmt_pct(1.0 / 137_500.0), "1 in 137,500");
+    }
+
+    #[test]
+    fn pct_never_rounds_to_certainty() {
+        assert_eq!(fmt_pct(0.99996), ">99.9%");
+        assert_eq!(fmt_pct(1.0), "100%");
+        assert_eq!(fmt_pct(f64::NAN), "–");
+    }
+
+    #[test]
+    fn ordinals() {
+        let v: Vec<String> = [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 100].iter().map(|&n| ordinal(n)).collect();
+        assert_eq!(v, ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "100th"]);
+    }
+
+    #[test]
+    fn short_id_handles_non_ascii_peer_ids() {
+        assert_eq!(short_id("ééééééé"), "player-ééééé");
+        assert_eq!(short_id("ab"), "player-ab");
+    }
+
+    #[test]
+    fn corrupt_identity_file_is_replaced_not_panicked_on() {
+        let p = std::env::temp_dir().join(format!("ll-id-bad-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&p, "é".repeat(40)).unwrap();
+        let k = load_or_create_identity(&p);
+        assert_eq!(load_or_create_identity(&p), k);
+        let _ = std::fs::remove_file(p);
     }
 
     #[test]

@@ -203,23 +203,29 @@ impl EventLog {
     }
 
     /// Effective chests: opened, not undone, with the latest tag applied. Sorted by time.
+    ///
+    /// Undo and Tag events only apply when they come from the chest's owner, so a buggy or
+    /// hostile peer cannot erase or relabel somebody else's chests. Undo/Tag events whose target
+    /// is unknown (not received yet, or never existed) are kept but have no effect; they apply
+    /// as soon as the chest arrives, whatever the arrival order.
     pub fn chests(&self) -> Vec<Chest> {
-        let undone: HashSet<Uuid> = self
+        let undone: HashSet<(Uuid, &str)> = self
             .events
             .values()
             .filter_map(|e| match e {
-                Event::Undo { target, .. } => Some(*target),
+                Event::Undo { target, player, .. } => Some((*target, player.as_str())),
                 _ => None,
             })
             .collect();
-        // latest tag per chest ((ts, id) ordering gives the same winner on every peer)
+        // latest tag per (chest, tagger) ((ts, id) ordering gives the same winner on every peer)
         type TagEntry = (i64, Uuid, Option<Rarity>, Option<String>);
-        let mut tags: HashMap<Uuid, TagEntry> = HashMap::new();
+        let mut tags: HashMap<(Uuid, &str), TagEntry> = HashMap::new();
         for e in self.events.values() {
-            if let Event::Tag { id, target, ts, rarity, item, .. } = e {
-                let better = tags.get(target).is_none_or(|(t, i, _, _)| (*ts, *id) > (*t, *i));
+            if let Event::Tag { id, target, ts, rarity, item, player } = e {
+                let key = (*target, player.as_str());
+                let better = tags.get(&key).is_none_or(|(t, i, _, _)| (*ts, *id) > (*t, *i));
                 if better {
-                    tags.insert(*target, (*ts, *id, *rarity, item.clone()));
+                    tags.insert(key, (*ts, *id, *rarity, item.clone()));
                 }
             }
         }
@@ -227,8 +233,10 @@ impl EventLog {
             .events
             .values()
             .filter_map(|e| match e {
-                Event::ChestOpened { id, player, ts, rarity, item, match_id } if !undone.contains(id) => {
-                    let (r, it) = match tags.get(id) {
+                Event::ChestOpened { id, player, ts, rarity, item, match_id }
+                    if !undone.contains(&(*id, player.as_str())) =>
+                {
+                    let (r, it) = match tags.get(&(*id, player.as_str())) {
                         Some((_, _, r, it)) => (*r, it.clone()),
                         None => (*rarity, item.clone()),
                     };
@@ -254,6 +262,25 @@ impl EventLog {
     /// The most recent not-yet-undone chest by `player`, for the "undo last" hotkey.
     pub fn last_chest_of(&self, player: &str) -> Option<Uuid> {
         self.chests().into_iter().rev().find(|c| c.player == player).map(|c| c.id)
+    }
+
+    /// Timestamp for a new Join / Leave / Rename about `player`: `now`, but strictly after every
+    /// membership event already logged for that player. Roster order is decided by (ts, id), so
+    /// without this a peer whose clock runs behind (e.g. a host kicking a player whose clock is
+    /// ahead) would create a Leave that sorts *before* the Join it is meant to override.
+    pub fn next_membership_ts(&self, player: &str, now: i64) -> i64 {
+        let last = self
+            .events
+            .values()
+            .filter(|e| {
+                matches!(e, Event::Join { .. } | Event::Leave { .. } | Event::Rename { .. }) && e.player() == player
+            })
+            .map(|e| e.ts())
+            .max();
+        match last {
+            Some(t) if t >= now => t.saturating_add(1),
+            _ => now,
+        }
     }
 
     /// Roster derived from Join / Leave / Rename events (ordered by (ts, id)).
@@ -417,5 +444,71 @@ mod tests {
         assert_eq!(l.last_chest_of("a"), Some(b.id()));
         l.insert(Event::Undo { id: Uuid::new_v4(), target: b.id(), player: "a".into(), ts: 3 });
         assert_eq!(l.last_chest_of("a"), Some(a.id()));
+    }
+
+    #[test]
+    fn undo_and_tag_from_another_player_are_ignored() {
+        let m = Uuid::new_v4();
+        let c = chest("a", 1, m);
+        let mut l = EventLog::new();
+        l.insert(c.clone());
+        l.insert(Event::Undo { id: Uuid::new_v4(), target: c.id(), player: "mallory".into(), ts: 2 });
+        l.insert(Event::Tag {
+            id: Uuid::new_v4(),
+            target: c.id(),
+            player: "mallory".into(),
+            ts: 3,
+            rarity: Some(Rarity::Mythic),
+            item: None,
+        });
+        assert_eq!(l.chests().len(), 1);
+        assert_eq!(l.chests()[0].rarity, None);
+    }
+
+    #[test]
+    fn undo_of_unknown_id_is_harmless_and_applies_late() {
+        let m = Uuid::new_v4();
+        let c = chest("a", 1, m);
+        let mut l = EventLog::new();
+        l.insert(chest("a", 0, m));
+        l.insert(Event::Undo { id: Uuid::new_v4(), target: Uuid::new_v4(), player: "a".into(), ts: 2 });
+        let late = Event::Undo { id: Uuid::new_v4(), target: c.id(), player: "a".into(), ts: 3 };
+        l.insert(late);
+        assert_eq!(l.chests().len(), 1);
+        // the target arrives after its undo: still undone
+        l.insert(c);
+        assert_eq!(l.chests().len(), 1);
+    }
+
+    #[test]
+    fn duplicate_delivery_does_not_double_count() {
+        let m = Uuid::new_v4();
+        let c = chest("a", 1, m);
+        let mut l = EventLog::new();
+        for _ in 0..5 {
+            l.merge(vec![c.clone(), c.clone()]);
+        }
+        assert_eq!(l.chest_counts().1, 1);
+    }
+
+    #[test]
+    fn kick_from_a_slow_clock_still_wins() {
+        let mut l = EventLog::new();
+        // player's clock is 10 minutes ahead of the host's
+        l.insert(Event::Join {
+            id: Uuid::new_v4(),
+            player: "p".into(),
+            name: "P".into(),
+            color: "#fff".into(),
+            detecting: false,
+            ts: 1_000_600_000,
+        });
+        let host_now = 1_000_000_000;
+        let ts = l.next_membership_ts("p", host_now);
+        assert!(ts > 1_000_600_000);
+        l.insert(Event::Leave { id: Uuid::new_v4(), player: "p".into(), ts });
+        assert!(!l.players()[0].active);
+        // with no prior events the wall clock is used unchanged
+        assert_eq!(l.next_membership_ts("nobody", host_now), host_now);
     }
 }

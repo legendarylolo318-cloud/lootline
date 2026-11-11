@@ -403,6 +403,18 @@ impl Actor {
         match i {
             Internal::Incoming(conn) => {
                 let id = proto::id_to_string(conn.remote_id().as_bytes());
+                // Handoff race: a member noticed the host was gone before we did and is already
+                // dialing us as the next host. If we've lost the host too and the handoff rule
+                // picks us, take over now instead of rejecting the member.
+                if self.mode == Mode::Client
+                    && self.members.contains(&id)
+                    && !self.peers.contains_key(&self.host_id)
+                    && self.ever_connected
+                    && proto::should_take_over(&self.members, &self.dead, &self.host_id, &self.me)
+                {
+                    self.dead.insert(self.host_id.clone());
+                    self.handoff(None);
+                }
                 if self.mode != Mode::Host || self.banned.contains(&id) || id == self.me {
                     conn.close(1u32.into(), b"not accepted");
                     return;

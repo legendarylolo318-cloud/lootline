@@ -73,6 +73,8 @@ fn main() {
         detect_ok: false,
         #[cfg(windows)]
         detector: None,
+        #[cfg(windows)]
+        game_pid: None,
         templates,
         overlay_chest: None,
         overlay_timer: Timer::default(),
@@ -123,6 +125,8 @@ fn main() {
     }
     if !start_hidden {
         let _ = ui.show();
+        // the start-up refresh ran before the window was visible
+        with_app(|a| a.refresh());
     }
 
     // keep "12s ago" labels fresh without a render loop

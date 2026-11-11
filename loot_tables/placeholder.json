@@ -1,7 +1,7 @@
 {
   "season": "placeholder",
-  "placeholder": false,
-  "note": "Per-chest rates (1 in N) from a public odds page citing Epic's Fortnite Status post of Nov 7, 2026, supplied by the project owner. Verify before relying on them. Audio cannot see what a chest contained, so finds are tagged by hand.",
+  "placeholder": true,
+  "note": "PLACEHOLDER VALUES. These per-chest rates were supplied by the project owner from a public odds page and have not been verified against Epic data. Replace this file (or publish loot_tables/<season>.json in the repo) with real values before relying on the odds. Audio cannot see what a chest contained, so finds are tagged by hand.",
   "items": [
     {
       "name": "Weekly Gold Outfit",

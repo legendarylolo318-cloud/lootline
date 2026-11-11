@@ -149,7 +149,8 @@ fn make_icon() -> tray_icon::Icon {
             if d < 0.5 {
                 let t = (x + y) as f32 / (2.0 * n as f32);
                 let (r, g, b) = (79.0 + t * 59.0, 140.0 - t * 48.0, 255.0);
-                let in_l = (x >= 10 && x <= 13 && y >= 7 && y <= 24) || (y >= 21 && y <= 24 && x >= 10 && x <= 22);
+                let in_l = ((10..=13).contains(&x) && (7..=24).contains(&y))
+                    || ((21..=24).contains(&y) && (10..=22).contains(&x));
                 let i = (y * n + x) * 4;
                 if in_l {
                     px[i..i + 4].copy_from_slice(&[255, 255, 255, 255]);
@@ -180,6 +181,7 @@ pub fn start_detector(app: &mut App) {
         sensitivity: app.settings.sensitivity,
         interact_key: app.settings.interact_key.clone(),
         templates: app.templates.clone(),
+        enabled: app.settings.detection_enabled,
     };
     app.detector = Some(lootline_detect::spawn(cfg, |e| on_ui(move |a| a.on_detect(e))));
 }
@@ -197,6 +199,10 @@ impl App {
         std::thread::spawn(move || {
             let res = loot::fetch_and_cache(&base, &season, &dir);
             on_ui(move |a| {
+                if a.settings.season != season || a.settings.repo_base_url != base {
+                    // settings changed while this fetch was in flight: its result is stale
+                    return;
+                }
                 match res {
                     Ok(t) => {
                         a.loot_status = format!(

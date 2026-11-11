@@ -64,7 +64,9 @@ impl KeyTracker {
                     let code = v.load(Ordering::Relaxed) as i32;
                     // SAFETY: GetAsyncKeyState only reads the global key state table.
                     let st = unsafe { GetAsyncKeyState(code) } as u16;
-                    if st & 0x8000 != 0 {
+                    // 0x8000 = down now; 0x0001 = pressed since the previous call, which catches
+                    // taps shorter than the 16 ms poll interval.
+                    if st & 0x8001 != 0 {
                         l.store(start.elapsed().as_millis() as u64 + 1, Ordering::Relaxed);
                     }
                     std::thread::sleep(Duration::from_millis(16));

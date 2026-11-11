@@ -129,7 +129,7 @@ mod tests {
         )
         .unwrap();
         let m = Uuid::new_v4();
-        let cs = vec![ch("a", 1, m, Some(Rarity::Rare), Some("A")), ch("a", 2, m, Some(Rarity::Common), None)];
+        let cs = [ch("a", 1, m, Some(Rarity::Rare), Some("A")), ch("a", 2, m, Some(Rarity::Common), None)];
         let refs: Vec<&Chest> = cs.iter().collect();
         let rows = odds_rows(&t, &refs);
         let a = rows.iter().find(|r| r.name == "A").unwrap();

@@ -67,9 +67,18 @@ impl LootTable {
     }
 }
 
+/// Season ids are used in a URL and a file name, so only [A-Za-z0-9_-] survive.
+pub fn safe_season(season: &str) -> String {
+    let s: String = season.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
+    if s.is_empty() {
+        "placeholder".into()
+    } else {
+        s
+    }
+}
+
 fn cache_path(dir: &Path, season: &str) -> PathBuf {
-    let safe: String = season.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_').collect();
-    dir.join(format!("{safe}.json"))
+    dir.join(format!("{}.json", safe_season(season)))
 }
 
 /// Load the cached table for `season`, falling back to the bundled placeholder.
@@ -82,7 +91,7 @@ pub fn load_cached_or_bundled(cache_dir: &Path, season: &str) -> LootTable {
 
 /// Fetch `<base_url>/loot_tables/<season>.json`, validate it, and cache it. Blocking.
 pub fn fetch_and_cache(base_url: &str, season: &str, cache_dir: &Path) -> Result<LootTable> {
-    let url = format!("{}/loot_tables/{}.json", base_url.trim_end_matches('/'), season);
+    let url = format!("{}/loot_tables/{}.json", base_url.trim_end_matches('/'), safe_season(season));
     let body = http_get(&url)?;
     let t = LootTable::parse(&body)?;
     std::fs::create_dir_all(cache_dir)?;
@@ -90,23 +99,53 @@ pub fn fetch_and_cache(base_url: &str, season: &str, cache_dir: &Path) -> Result
     Ok(t)
 }
 
+/// Largest response accepted from the repo (loot tables and templates are a few KB).
+pub const MAX_DOWNLOAD: u64 = 2 * 1024 * 1024;
+
 pub fn http_get(url: &str) -> Result<String> {
-    let client =
-        reqwest::blocking::Client::builder().timeout(Duration::from_secs(10)).user_agent("lootline").build()?;
-    let resp = client.get(url).send()?.error_for_status()?;
-    Ok(resp.text()?)
+    String::from_utf8(http_get_bytes(url)?).context("response is not UTF-8")
 }
 
 pub fn http_get_bytes(url: &str) -> Result<Vec<u8>> {
+    use std::io::Read;
+    anyhow::ensure!(url.starts_with("https://") || url.starts_with("http://"), "not an http(s) URL: {url}");
     let client =
         reqwest::blocking::Client::builder().timeout(Duration::from_secs(10)).user_agent("lootline").build()?;
     let resp = client.get(url).send()?.error_for_status()?;
-    Ok(resp.bytes()?.to_vec())
+    if let Some(len) = resp.content_length() {
+        anyhow::ensure!(len <= MAX_DOWNLOAD, "response too large ({len} bytes)");
+    }
+    let mut out = Vec::new();
+    resp.take(MAX_DOWNLOAD + 1).read_to_end(&mut out)?;
+    anyhow::ensure!(out.len() as u64 <= MAX_DOWNLOAD, "response too large");
+    Ok(out)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn season_is_sanitised_for_url_and_path() {
+        assert_eq!(safe_season("../../etc"), "etc");
+        assert_eq!(safe_season("c6s1"), "c6s1");
+        assert_eq!(safe_season("???"), "placeholder");
+    }
+
+    #[test]
+    fn fetch_failure_falls_back_cleanly() {
+        let dir = std::env::temp_dir().join(format!("lootline-fetch-{}", uuid::Uuid::new_v4()));
+        // unroutable / invalid URLs fail without panicking and without touching the cache
+        assert!(fetch_and_cache("not a url", "x", &dir).is_err());
+        assert!(fetch_and_cache("http://127.0.0.1:9", "x", &dir).is_err());
+        assert!(!dir.exists());
+        assert_eq!(load_cached_or_bundled(&dir, "x"), LootTable::bundled());
+    }
+
+    #[test]
+    fn bundled_table_is_flagged_placeholder() {
+        assert!(LootTable::bundled().placeholder);
+    }
 
     #[test]
     fn bundled_table_parses() {

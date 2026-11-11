@@ -61,7 +61,7 @@ impl Default for Settings {
             theme: "Dark".into(),
             rarity_overrides: BTreeMap::new(),
             season: "placeholder".into(),
-            repo_base_url: "https://raw.githubusercontent.com/lootline/lootline/main".into(),
+            repo_base_url: "https://raw.githubusercontent.com/legendarylolo318-cloud/lootline/main".into(),
             minimize_to_tray: true,
             start_minimized: false,
         }
@@ -74,13 +74,48 @@ fn whoami_fallback() -> String {
 
 impl Settings {
     pub fn load(path: &Path) -> Settings {
-        std::fs::read_to_string(path).ok().and_then(|s| toml::from_str(&s).ok()).unwrap_or_default()
+        let mut s: Settings =
+            std::fs::read_to_string(path).ok().and_then(|s| toml::from_str(&s).ok()).unwrap_or_default();
+        s.sanitize();
+        s
     }
+
+    /// Clamp hand-edited or corrupt values (NaN sensitivity, zero-size overlay, ...) into range.
+    pub fn sanitize(&mut self) {
+        let d = Settings::default();
+        if !self.sensitivity.is_finite() {
+            self.sensitivity = d.sensitivity;
+        }
+        self.sensitivity = self.sensitivity.clamp(0.0, 1.0);
+        let o = &mut self.overlay;
+        if !o.timeout_secs.is_finite() {
+            o.timeout_secs = d.overlay.timeout_secs;
+        }
+        o.timeout_secs = o.timeout_secs.clamp(1.0, 30.0);
+        o.width = o.width.clamp(260, 1200);
+        o.height = o.height.clamp(110, 600);
+        o.x = o.x.clamp(-20_000, 20_000);
+        o.y = o.y.clamp(-20_000, 20_000);
+        if self.player_name.trim().is_empty() {
+            self.player_name = d.player_name;
+        }
+        self.player_name = self.player_name.chars().take(24).collect();
+        if crate::theme::parse_color(&self.player_color).is_none() {
+            self.player_color = d.player_color;
+        }
+        if self.interact_key.trim().is_empty() {
+            self.interact_key = d.interact_key;
+        }
+    }
+
+    /// Write via a temp file + rename so a crash mid-write never leaves a truncated file.
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(p) = path.parent() {
             std::fs::create_dir_all(p)?;
         }
-        std::fs::write(path, toml::to_string_pretty(self)?)?;
+        let tmp = path.with_extension("toml.tmp");
+        std::fs::write(&tmp, toml::to_string_pretty(self)?)?;
+        std::fs::rename(&tmp, path)?;
         Ok(())
     }
     /// Detection threshold for the matcher; sensitivity 1.0 is loosest.
@@ -102,9 +137,11 @@ mod tests {
     fn roundtrip() {
         let dir = std::env::temp_dir().join(format!("lootline-set-{}", uuid::Uuid::new_v4()));
         let p = dir.join("settings.toml");
-        let mut s = Settings::default();
-        s.interact_key = "F".into();
-        s.overlay.x = 99;
+        let s = Settings {
+            interact_key: "F".into(),
+            overlay: OverlaySettings { x: 99, ..Default::default() },
+            ..Default::default()
+        };
         s.save(&p).unwrap();
         assert_eq!(Settings::load(&p), s);
         let _ = std::fs::remove_dir_all(dir);
@@ -121,6 +158,22 @@ mod tests {
         assert_eq!(s.hotkey_add, "F8");
         std::fs::write(&p, "{{{{").unwrap();
         assert_eq!(Settings::load(&p).interact_key, "E");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn out_of_range_values_are_clamped() {
+        let dir = std::env::temp_dir().join(format!("lootline-set-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("s.toml");
+        std::fs::write(&p, "sensitivity = nan\nplayer_color = \"blue\"\n[overlay]\nwidth = 0\ntimeout_secs = -5.0\n")
+            .unwrap();
+        let s = Settings::load(&p);
+        assert_eq!(s.sensitivity, 0.5);
+        assert!(s.threshold().is_finite());
+        assert_eq!(s.overlay.width, 260);
+        assert_eq!(s.overlay.timeout_secs, 1.0);
+        assert_eq!(s.player_color, Settings::default().player_color);
         let _ = std::fs::remove_dir_all(dir);
     }
 
