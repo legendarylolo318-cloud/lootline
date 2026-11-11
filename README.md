@@ -25,8 +25,9 @@ Grab `lootline-<version>-windows-x86_64.exe` from the [latest release](https://g
   key (default E) was held in the 1.5 s before the sound; 2 s debounce; sensitivity slider; runs on its own thread.
 - **Templates** live in `templates/`, fetched from the repo, plus an in-app **Record template** tool.
 - **Manual fallback**: global hotkeys, F8 add chest, F9 undo.
-- **Rarity overlay**: borderless always-on-top, no-activate window with one-click Common..Mythic buttons and an
-  item dropdown; auto-hides after 3 s (chest stays counted, rarity unknown). Position, size, timeout configurable.
+- **Rarity overlay** (optional, **off by default**; enable in Settings): borderless always-on-top, no-activate window
+  with one-click Common..Mythic buttons and an item dropdown that appears after each chest; auto-hides after 3 s
+  (chest stays counted, rarity unknown). Position, size, timeout configurable.
 - **Party** (iroh, peer to peer, no server, no port forwarding): host gets a copyable code, others paste it.
   Append-only event log merged by set union; newcomers and reconnects exchange what they are missing; host can kick;
   host leaving hands over to the next member. **The party total is the sum of everyone's chests.**

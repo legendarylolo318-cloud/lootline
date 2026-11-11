@@ -19,7 +19,8 @@ pub struct OverlaySettings {
 
 impl Default for OverlaySettings {
     fn default() -> Self {
-        OverlaySettings { enabled: true, x: 40, y: 300, width: 420, height: 150, timeout_secs: 3.0 }
+        // Off by default: popping up on every chest gets in the way mid-game. Opt in from Settings.
+        OverlaySettings { enabled: false, x: 40, y: 300, width: 420, height: 150, timeout_secs: 3.0 }
     }
 }
 
@@ -179,6 +180,14 @@ mod tests {
         assert_eq!(s.overlay.timeout_secs, 1.0);
         assert_eq!(s.player_color, Settings::default().player_color);
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn overlay_does_not_pop_up_by_default() {
+        assert!(!Settings::default().overlay.enabled);
+        // an existing settings file without an [overlay] section also gets the quiet default
+        let s: Settings = toml::from_str("interact_key = \"E\"").unwrap();
+        assert!(!s.overlay.enabled);
     }
 
     #[test]
