@@ -55,12 +55,12 @@ component Bars inherits Rectangle {
             Rectangle {
                 height: 14px;
                 y: 5px;
-                border-radius: 7px;
+                border-radius: self.height / 2;
                 background: Theme.surface-alt;
                 Rectangle {
                     x: 0px;
                     width: Math.max(d.value > 0 ? 14px : 0px, parent.width * d.frac);
-                    border-radius: 7px;
+                    border-radius: self.height / 2;
                     background: Theme.rarity-brush(d.rarity);
                     animate width { duration: 400ms; easing: ease-out; }
                 }
@@ -79,18 +79,18 @@ component PlayerBars inherits Rectangle {
             spacing: 10px;
             Rectangle {
                 width: 10px;
-                Rectangle { width: 10px; height: 10px; border-radius: 5px; background: d.color; }
+                Rectangle { width: 10px; height: 10px; border-radius: self.width / 2; background: d.color; }
             }
             T { width: 120px; text: d.name; overflow: elide; vertical-alignment: center; }
             Rectangle {
                 height: 14px;
                 y: 6px;
-                border-radius: 7px;
+                border-radius: self.height / 2;
                 background: Theme.surface-alt;
                 Rectangle {
                     x: 0px;
                     width: Math.max(d.count > 0 ? 14px : 0px, parent.width * d.frac);
-                    border-radius: 7px;
+                    border-radius: self.height / 2;
                     background: d.color;
                     animate width { duration: 400ms; easing: ease-out; }
                 }
@@ -110,10 +110,12 @@ export component HistoryPage inherits Rectangle {
             VerticalLayout {
                 padding: 14px;
                 spacing: 4px;
-                T { text: "History"; font-size: 22px; font-weight: 800; x: 8px; }
-                Dim { text: "Sessions and matches"; }
+                alignment: start;
+                T { text: "History"; font-size: 22px; font-weight: 800; vertical-stretch: 0; }
+                Dim { text: "Sessions and matches"; vertical-stretch: 0; }
                 Rectangle { height: 6px; }
                 ScrollBox {
+                    vertical-stretch: 1;
                     VerticalLayout {
                         spacing: 4px;
                         for r in Backend.history: HistItem { r: r; clicked => { Backend.select-history(r.id); } }

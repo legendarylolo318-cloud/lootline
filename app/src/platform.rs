@@ -27,3 +27,59 @@ pub fn style_overlay(w: &slint::Window) {
 
 #[cfg(not(windows))]
 pub fn style_overlay(_w: &slint::Window) {}
+
+/// Shrink and centre the main window if its preferred size doesn't fit the primary monitor's
+/// work area (e.g. 1920x1080 at 150% leaves ~1280x672 logical pixels). Only our own window.
+#[cfg(windows)]
+pub fn fit_to_work_area(w: &slint::Window) {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    };
+    let mut r = RECT::default();
+    // SAFETY: SPI_GETWORKAREA writes one RECT into the buffer we pass.
+    let ok = unsafe {
+        SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            Some(&mut r as *mut RECT as *mut _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    };
+    if ok.is_err() {
+        return;
+    }
+    let scale = w.scale_factor().max(0.5);
+    // leave room for the title bar and frame
+    let (area_w, area_h) = ((r.right - r.left) as f32 / scale, (r.bottom - r.top) as f32 / scale - 40.0);
+    if let Some((x, y, cw, ch)) = fit(w.size().to_logical(scale), area_w, area_h) {
+        w.set_size(slint::LogicalSize::new(cw, ch));
+        w.set_position(slint::LogicalPosition::new(r.left as f32 / scale + x, r.top as f32 / scale + y));
+    }
+}
+
+#[cfg(not(windows))]
+pub fn fit_to_work_area(_w: &slint::Window) {}
+
+/// New (x, y, w, h) inside an `area_w` x `area_h` area if `cur` doesn't fit, else None.
+pub fn fit(cur: slint::LogicalSize, area_w: f32, area_h: f32) -> Option<(f32, f32, f32, f32)> {
+    if cur.width <= area_w && cur.height <= area_h {
+        return None;
+    }
+    let (w, h) = (cur.width.min(area_w), cur.height.min(area_h));
+    Some((((area_w - w) / 2.0).max(0.0), ((area_h - h) / 2.0).max(0.0) + 4.0, w, h))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fit;
+    use slint::LogicalSize;
+
+    #[test]
+    fn shrinks_only_when_needed() {
+        // 1080p at 150%: 1280 x 672 work area, minus title bar
+        assert_eq!(fit(LogicalSize::new(1280.0, 820.0), 1280.0, 632.0), Some((0.0, 4.0, 1280.0, 632.0)));
+        // 1440p at 100%: fits, untouched
+        assert_eq!(fit(LogicalSize::new(1280.0, 820.0), 2560.0, 1352.0), None);
+    }
+}

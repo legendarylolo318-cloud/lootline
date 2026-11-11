@@ -24,7 +24,7 @@ component NavItem inherits Rectangle {
         y: 10px;
         width: 3px;
         height: parent.height - 20px;
-        border-radius: 2px;
+        border-radius: self.width / 2;
         background: Theme.accent;
         opacity: Backend.page == root.index ? 1.0 : 0.0;
         animate opacity { duration: 140ms; }
@@ -56,7 +56,7 @@ component NavItem inherits Rectangle {
 export component MainWindow inherits Window {
     title: "Lootline";
     min-width: 1000px;
-    min-height: 680px;
+    min-height: 560px;
     preferred-width: 1280px;
     preferred-height: 820px;
     background: Theme.bg;
@@ -90,7 +90,7 @@ export component MainWindow inherits Window {
                     Rectangle {
                         height: 4px;
                         width: 70px;
-                        border-radius: 2px;
+                        border-radius: self.height / 2;
                         background: Theme.accent-gradient;
                     }
                 }
@@ -129,7 +129,7 @@ export component MainWindow inherits Window {
                 x: (parent.width - self.width) / 2;
                 width: toast-text.preferred-width + 40px;
                 height: 40px;
-                border-radius: 20px;
+                border-radius: self.height / 2;
                 background: Theme.surface-alt;
                 border-width: 1px;
                 border-color: Theme.accent;

@@ -17,7 +17,7 @@ component PartyLine inherits Rectangle {
             Rectangle {
                 width: 10px;
                 height: 10px;
-                border-radius: 5px;
+                border-radius: self.width / 2;
                 background: rw.color;
             }
         }
@@ -64,7 +64,7 @@ component FeedLine inherits Rectangle {
         width: 4px;
         height: parent.height - 12px;
         y: 6px;
-        border-radius: 2px;
+        border-radius: self.width / 2;
         background: Theme.rarity-brush(rw.rarity);
     }
     HorizontalLayout {
@@ -111,7 +111,7 @@ export component DashboardPage inherits Rectangle {
                 Rectangle {
                     width: 240px;
                     height: 34px;
-                    border-radius: 17px;
+                    border-radius: self.height / 2;
                     background: Theme.surface;
                     border-width: 1px;
                     border-color: Backend.detect-ok ? Theme.good.transparentize(0.4) : Theme.border;
@@ -144,7 +144,7 @@ export component DashboardPage inherits Rectangle {
                         y: 1px;
                         width: parent.width - 2px;
                         height: 5px;
-                        border-radius: 2px;
+                        border-radius: self.height / 2;
                         background: Theme.accent-gradient;
                     }
                     HorizontalLayout {
@@ -196,6 +196,7 @@ export component DashboardPage inherits Rectangle {
                                 width: 100%;
                                 horizontal-alignment: center;
                                 text: Backend.luck-sub;
+                                overflow: elide;
                             }
                         }
                     }

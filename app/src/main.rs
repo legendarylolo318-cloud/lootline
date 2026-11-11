@@ -2,6 +2,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod app;
+mod devshot;
 mod glue;
 mod overlay;
 mod platform;
@@ -125,8 +126,13 @@ fn main() {
     }
     if !start_hidden {
         let _ = ui.show();
+        platform::fit_to_work_area(ui.window());
         // the start-up refresh ran before the window was visible
         with_app(|a| a.refresh());
+    }
+
+    if let Some(dir) = std::env::var_os("LOOTLINE_SNAPSHOT") {
+        devshot::start(&ui, dir.into());
     }
 
     // keep "12s ago" labels fresh without a render loop

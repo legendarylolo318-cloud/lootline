@@ -31,7 +31,7 @@ export component OverlayWindow inherits Window {
     ]
 
     Rectangle {
-        border-radius: 10px;
+        border-radius: Theme.radius-small + 2px;
         border-width: 1px;
         border-color: Theme.accent;
         background: Theme.surface;
@@ -52,7 +52,7 @@ export component OverlayWindow inherits Window {
                 Rectangle {
                     width: 24px;
                     height: 24px;
-                    border-radius: 12px;
+                    border-radius: self.height / 2;
                     background: close-ta.has-hover ? Theme.border : transparent;
                     T { text: "×"; width: 100%; height: 100%; horizontal-alignment: center; vertical-alignment: center; font-size: 16px; color: Theme.text-dim; }
                     close-ta := TouchArea { mouse-cursor: pointer; clicked => { root.dismiss(); } }
@@ -62,7 +62,7 @@ export component OverlayWindow inherits Window {
                 spacing: 6px;
                 for r in 6: Rectangle {
                     height: 40px;
-                    border-radius: 8px;
+                    border-radius: Theme.radius-small;
                     background: Theme.rarity-brush(r).transparentize(rt.has-hover ? 0.55 : 0.8);
                     border-width: 1px;
                     border-color: Theme.rarity-color(r);
@@ -85,7 +85,7 @@ export component OverlayWindow inherits Window {
                 Rectangle {
                     height: 26px;
                     width: 120px;
-                    border-radius: 6px;
+                    border-radius: Math.max(0px, Theme.radius-small - 2px);
                     background: it-ta.has-hover ? Theme.border : Theme.surface-alt;
                     T {
                         text: root.expanded ? "Item  ▲" : "Item  ▼";
@@ -107,12 +107,12 @@ export component OverlayWindow inherits Window {
                     // countdown bar
                     height: 4px;
                     y: 11px;
-                    border-radius: 2px;
+                    border-radius: self.height / 2;
                     background: Theme.border;
                     Rectangle {
                         x: 0px;
                         width: parent.width * root.progress;
-                        border-radius: 2px;
+                        border-radius: self.height / 2;
                         background: Theme.accent-gradient;
                     }
                 }
@@ -122,14 +122,14 @@ export component OverlayWindow inherits Window {
                     spacing: 2px;
                     for it in root.items: Rectangle {
                         height: 28px;
-                        border-radius: 6px;
+                        border-radius: Math.max(0px, Theme.radius-small - 2px);
                         background: ia.has-hover ? Theme.surface-alt : transparent;
                         HorizontalLayout {
                             padding-left: 10px;
                             spacing: 8px;
                             Rectangle {
                                 width: 8px;
-                                Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.rarity-brush(it.rarity); }
+                                Rectangle { width: 8px; height: 8px; border-radius: self.width / 2; background: Theme.rarity-brush(it.rarity); }
                             }
                             T { text: it.name; vertical-alignment: center; overflow: elide; color: Theme.rarity-color(it.rarity); }
                         }

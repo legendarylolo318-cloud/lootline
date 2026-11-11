@@ -79,12 +79,7 @@ fn odds_ui(r: &OddsRow) -> UiOddsRow {
         rarity: r.rarity.index() as i32,
         is_group: r.is_rarity_row,
         p: fmt_pct(s.p).into(),
-        expected: if s.expected == 0.0 || s.expected >= 0.01 {
-            format!("{:.2}", s.expected)
-        } else {
-            lootline_core::odds::fmt::num(s.expected)
-        }
-        .into(),
+        expected: fmt_expected(s.expected).into(),
         got: s.got as i32,
         p1: fmt_pct(s.p_at_least_one).into(),
         luck: s.luck as f32,

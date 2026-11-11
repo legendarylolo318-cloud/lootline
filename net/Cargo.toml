@@ -11,8 +11,8 @@ serde_json.workspace = true
 uuid.workspace = true
 anyhow.workspace = true
 tokio.workspace = true
-iroh = "1"
+iroh = { version = "1", default-features = false, features = ["tls-ring", "portmapper"] }
 
 [dev-dependencies]
-iroh = "1"
+iroh = { version = "1", default-features = false, features = ["tls-ring", "portmapper"] }
 uuid.workspace = true

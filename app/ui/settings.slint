@@ -37,7 +37,7 @@ component ColorRow inherits Rectangle {
             width: 28px;
             height: 28px;
             y: 4px;
-            border-radius: 6px;
+            border-radius: Math.max(0px, Theme.radius-small - 2px);
             background: f.value;
             border-width: 1px;
             border-color: Theme.border;
@@ -57,7 +57,10 @@ component ThemeChipView inherits Rectangle {
     in property <ThemeChip> c;
     callback clicked();
     height: 64px;
-    width: 120px;
+    // full size when there is room; shrinks so six chips still fit a minimum-size window
+    min-width: 88px;
+    preferred-width: 120px;
+    max-width: 120px;
     border-radius: Theme.radius-small;
     background: c.bg;
     border-width: c.active ? 2px : 1px;
@@ -67,14 +70,14 @@ component ThemeChipView inherits Rectangle {
         y: 10px;
         width: parent.width - 20px;
         height: 20px;
-        border-radius: 5px;
+        border-radius: Math.max(0px, Theme.radius-small - 3px);
         background: c.surface;
         Rectangle {
             x: 5px;
             y: 5px;
             width: 40px;
             height: 10px;
-            border-radius: 5px;
+            border-radius: self.height / 2;
             background: c.accent;
         }
     }
@@ -120,7 +123,7 @@ export component SettingsPage inherits Rectangle {
                         for c in Backend.palette: Rectangle {
                             width: 30px;
                             height: 30px;
-                            border-radius: 15px;
+                            border-radius: self.width / 2;
                             background: c.value;
                             border-width: Backend.player-color == c.hex ? 3px : 1px;
                             border-color: Backend.player-color == c.hex ? Theme.text : Theme.border;
@@ -256,7 +259,7 @@ export component SettingsPage inherits Rectangle {
                 Labeled {
                     label: "Save as";
                     label-width: 70px;
-                    Field { width: 240px; text <=> Backend.theme-name; placeholder: "My theme"; }
+                    Field { min-width: 110px; preferred-width: 240px; text <=> Backend.theme-name; placeholder: "My theme"; }
                     Btn { text: "Save theme"; primary: true; clicked => { Backend.save-theme(); } }
                     Btn { text: "Export (copy TOML)"; clicked => { Backend.export-theme(); } }
                     Btn { text: "Open folder"; clicked => { Backend.open-themes-folder(); } }

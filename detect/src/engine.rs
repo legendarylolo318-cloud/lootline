@@ -194,6 +194,7 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
                         enabled = on;
                         if !on {
                             capture = None; // Drop stops and joins the capture thread
+                            keys.set_active(false);
                             if recording.take().is_some() {
                                 emit(Event::RecordingDone(Err("detection was switched off".into())));
                             }
@@ -240,6 +241,7 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
                 if let Some(pid) = find_fortnite_pid() {
                     let (ctx, crx) = mpsc::sync_channel(64);
                     capture = Some((pid, Capture::start(pid, ctx), crx));
+                    keys.set_active(true);
                     extractor = MelExtractor::new();
                     matcher = Matcher::new(&templates, threshold_for(sensitivity));
                     emit(Event::Status(Status::Attached { pid }));
@@ -247,7 +249,13 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
                     backoff.reset();
                 }
             }
-            std::thread::sleep(Duration::from_millis(100));
+            // Sleep on the command channel until the next scan (no 10 Hz polling while idle).
+            let wait = last_scan.map_or(Duration::ZERO, |t| backoff.delay().saturating_sub(t.elapsed()));
+            match cmds.recv_timeout(wait.max(Duration::from_millis(50))) {
+                Ok(c) => pending = Some(c),
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            }
             continue;
         }
 
@@ -299,6 +307,7 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
 
         if let Some(why) = ended {
             capture = None; // Drop stops and joins the capture thread
+            keys.set_active(false);
             if recording.take().is_some() {
                 emit(Event::RecordingDone(Err("Fortnite closed during recording".into())));
             }

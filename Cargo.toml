@@ -15,14 +15,14 @@ toml = "0.8"
 uuid = { version = "1", features = ["v4", "serde"] }
 anyhow = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "io-util"] }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time", "io-util"] }
 lootline-core = { path = "core" }
 lootline-detect = { path = "detect" }
 lootline-net = { path = "net" }
 
 [profile.release]
 opt-level = 3
-lto = "thin"
-codegen-units = 4
+lto = "fat"
+codegen-units = 1
 strip = true
 panic = "abort"

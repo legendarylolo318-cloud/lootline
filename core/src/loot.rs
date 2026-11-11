@@ -109,6 +109,9 @@ pub fn http_get(url: &str) -> Result<String> {
 pub fn http_get_bytes(url: &str) -> Result<Vec<u8>> {
     use std::io::Read;
     anyhow::ensure!(url.starts_with("https://") || url.starts_with("http://"), "not an http(s) URL: {url}");
+    // reqwest is built without a bundled crypto provider; use ring (already linked by iroh).
+    // Installing twice is harmless (the second call just reports the existing one).
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let client =
         reqwest::blocking::Client::builder().timeout(Duration::from_secs(10)).user_agent("lootline").build()?;
     let resp = client.get(url).send()?.error_for_status()?;

@@ -128,9 +128,9 @@ pub fn fmt_pct(v: f64) -> String {
         // too small for a percentage to be readable: show "1 in N"
         return format!("1 in {}", thousands((1.0 / v).round() as u64));
     }
-    if v < 1.0 && p >= 99.95 {
+    if v < 1.0 && p >= 99.5 {
         // never round "almost certain" up to a flat 100%
-        return ">99.9%".into();
+        return if p >= 99.95 { ">99.9%".into() } else { format!("{p:.1}%") };
     }
     if p >= 10.0 {
         format!("{p:.0}%")
@@ -138,6 +138,21 @@ pub fn fmt_pct(v: f64) -> String {
         format!("{p:.1}%")
     } else {
         format!("{p:.2}%")
+    }
+}
+
+/// Expected hit counts for the odds table: two decimals normally, more for the rare items
+/// (the old "{:.2}" showed the weekly treasures as a flat 0.00).
+pub fn fmt_expected(v: f64) -> String {
+    if !v.is_finite() {
+        return "–".into();
+    }
+    if v == 0.0 || v >= 0.01 {
+        format!("{v:.2}")
+    } else if v >= 0.0001 {
+        format!("{v:.4}").trim_end_matches('0').to_string()
+    } else {
+        "<0.0001".into()
     }
 }
 
@@ -181,8 +196,19 @@ mod tests {
     #[test]
     fn pct_never_rounds_to_certainty() {
         assert_eq!(fmt_pct(0.99996), ">99.9%");
+        assert_eq!(fmt_pct(0.99920), "99.9%"); // was "100%"
+        assert_eq!(fmt_pct(0.994), "99%");
         assert_eq!(fmt_pct(1.0), "100%");
         assert_eq!(fmt_pct(f64::NAN), "–");
+    }
+
+    #[test]
+    fn expected_formatting() {
+        assert_eq!(fmt_expected(1.6), "1.60");
+        assert_eq!(fmt_expected(0.0), "0.00");
+        assert_eq!(fmt_expected(8.0e-4), "0.0008");
+        assert_eq!(fmt_expected(1.4e-3), "0.0014");
+        assert_eq!(fmt_expected(7.04e-5), "<0.0001");
     }
 
     #[test]

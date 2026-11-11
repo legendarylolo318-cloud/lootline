@@ -57,7 +57,7 @@ export component Toggle inherits Rectangle {
     callback toggled(bool);
     width: 44px;
     height: 24px;
-    border-radius: 12px;
+    border-radius: self.height / 2;
     background: checked ? Theme.accent : Theme.border;
     animate background { duration: 140ms; }
     Rectangle {
@@ -65,7 +65,7 @@ export component Toggle inherits Rectangle {
         x: root.checked ? root.width - self.width - 3px : 3px;
         width: 18px;
         height: 18px;
-        border-radius: 9px;
+        border-radius: self.width / 2;
         background: Theme.on-accent;
         animate x { duration: 140ms; easing: ease-out; }
     }
@@ -89,12 +89,12 @@ export component Slide inherits Rectangle {
     Rectangle {
         y: (parent.height - self.height) / 2;
         height: 6px;
-        border-radius: 3px;
+        border-radius: self.height / 2;
         background: Theme.border;
         Rectangle {
             x: 0px;
             width: parent.width * root.value;
-            border-radius: 3px;
+            border-radius: self.height / 2;
             background: Theme.accent-gradient;
         }
     }
@@ -103,7 +103,7 @@ export component Slide inherits Rectangle {
         y: (root.height - self.height) / 2;
         width: 20px;
         height: 20px;
-        border-radius: 10px;
+        border-radius: self.width / 2;
         background: Theme.text;
         border-width: 3px;
         border-color: Theme.accent;
@@ -194,7 +194,7 @@ export component Dot inherits Rectangle {
     in property <bool> on: false;
     width: 10px;
     height: 10px;
-    border-radius: 5px;
+    border-radius: self.width / 2;
     background: on ? Theme.good : Theme.text-dim.with-alpha(0.5);
 }
 
@@ -202,7 +202,7 @@ export component RarityChip inherits Rectangle {
     in property <int> rarity: 0;
     in property <string> label;
     height: 22px;
-    border-radius: 11px;
+    border-radius: self.height / 2;
     background: Theme.rarity-brush(rarity).transparentize(0.82);
     border-width: 1px;
     border-color: Theme.rarity-color(rarity).transparentize(0.35);
@@ -229,7 +229,7 @@ export component ScrollBox inherits Rectangle {
     if fl.content-height > root.height + 1px: Rectangle {
         x: root.width - 7px;
         width: 4px;
-        border-radius: 2px;
+        border-radius: self.width / 2;
         background: Theme.border;
         height: Math.max(32px, root.height * root.height / fl.content-height);
         y: -fl.content-y / Math.max(1px, fl.content-height - root.height) * (root.height - self.height);
@@ -346,7 +346,7 @@ export component LuckGauge inherits Rectangle {
 export component LuckBar inherits Rectangle {
     in property <float> value: 0.5;
     height: 8px;
-    border-radius: 4px;
+    border-radius: self.height / 2;
     background: Theme.luck-gradient;
     opacity: 0.55;
     Rectangle {
@@ -354,7 +354,7 @@ export component LuckBar inherits Rectangle {
         y: -3px;
         width: 4px;
         height: 14px;
-        border-radius: 2px;
+        border-radius: self.width / 2;
         background: Theme.text;
     }
 }

@@ -16,7 +16,7 @@ component RosterLine inherits Rectangle {
             Rectangle {
                 width: 28px;
                 height: 28px;
-                border-radius: 14px;
+                border-radius: self.width / 2;
                 background: rw.color;
                 T {
                     text: rw.initial;
@@ -121,6 +121,7 @@ export component PartyPage inherits Rectangle {
                 VerticalLayout {
                     padding: 24px;
                     spacing: 12px;
+                    alignment: start;
                     HorizontalLayout {
                         spacing: 12px;
                         VerticalLayout {

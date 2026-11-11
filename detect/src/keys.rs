@@ -47,6 +47,9 @@ pub struct KeyTracker {
     last_down: Arc<AtomicU64>,
     start: Instant,
     stop: Arc<AtomicBool>,
+    /// Polling only happens while active (i.e. while attached to Fortnite); otherwise the
+    /// thread is parked and costs nothing.
+    active: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
@@ -55,12 +58,17 @@ impl KeyTracker {
         let vk = Arc::new(AtomicU32::new(vk as u32));
         let last_down = Arc::new(AtomicU64::new(0));
         let stop = Arc::new(AtomicBool::new(false));
+        let active = Arc::new(AtomicBool::new(false));
         let start = Instant::now();
-        let (v, l, s) = (vk.clone(), last_down.clone(), stop.clone());
+        let (v, l, s, a) = (vk.clone(), last_down.clone(), stop.clone(), active.clone());
         let handle = std::thread::Builder::new()
             .name("lootline-keys".into())
             .spawn(move || {
                 while !s.load(Ordering::Relaxed) {
+                    if !a.load(Ordering::Acquire) {
+                        std::thread::park();
+                        continue;
+                    }
                     let code = v.load(Ordering::Relaxed) as i32;
                     // SAFETY: GetAsyncKeyState only reads the global key state table.
                     let st = unsafe { GetAsyncKeyState(code) } as u16;
@@ -73,7 +81,16 @@ impl KeyTracker {
                 }
             })
             .ok();
-        KeyTracker { vk, last_down, start, stop, handle }
+        KeyTracker { vk, last_down, start, stop, active, handle }
+    }
+
+    /// Start (true) or park (false) the polling thread.
+    pub fn set_active(&self, on: bool) {
+        if self.active.swap(on, Ordering::AcqRel) != on && on {
+            if let Some(h) = &self.handle {
+                h.thread().unpark();
+            }
+        }
     }
 
     pub fn set_key(&self, vk: u16) {
@@ -96,6 +113,7 @@ impl Drop for KeyTracker {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(h) = self.handle.take() {
+            h.thread().unpark();
             let _ = h.join();
         }
     }
@@ -122,7 +140,20 @@ mod tests {
     fn never_pressed_key_is_not_held() {
         // VK 0xFF is unassigned, so it never reads as down
         let t = KeyTracker::start(0xFF);
+        t.set_active(true);
         std::thread::sleep(Duration::from_millis(50));
         assert!(!t.held_within(Duration::from_secs(5)));
+    }
+
+    #[test]
+    fn parked_tracker_starts_and_stops_cleanly() {
+        let t = KeyTracker::start(0xFF);
+        t.set_active(true);
+        t.set_active(false);
+        t.set_active(true);
+        std::thread::sleep(Duration::from_millis(20));
+        drop(t); // must not hang on a parked thread
+        let t = KeyTracker::start(0xFF);
+        drop(t);
     }
 }

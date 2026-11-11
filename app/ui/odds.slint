@@ -39,6 +39,7 @@ component Cell inherits Rectangle {
 
 component Row inherits Rectangle {
     in property <OddsRow> r;
+    in property <bool> compact: false;
     height: 46px;
     border-radius: Theme.radius-small;
     background: r.is-group ? Theme.surface-alt.with-alpha(0.55) : transparent;
@@ -54,7 +55,7 @@ component Row inherits Rectangle {
                     width: 4px;
                     height: 22px;
                     y: (parent.height - self.height) / 2;
-                    border-radius: 2px;
+                    border-radius: self.width / 2;
                     background: Theme.rarity-brush(r.rarity);
                 }
                 T {
@@ -66,15 +67,15 @@ component Row inherits Rectangle {
             }
         }
         Rectangle {
-            width: 100px;
+            width: root.compact ? 86px : 100px;
             RarityChip { rarity: r.rarity; y: (parent.height - self.height) / 2; }
         }
-        Cell { width: 70px; tip: r.tip-p; T { text: r.p; vertical-alignment: center; } }
-        Cell { width: 76px; tip: r.tip-expected; T { text: r.expected; vertical-alignment: center; } }
-        Cell { width: 52px; T { text: "\{r.got}"; vertical-alignment: center; font-weight: 700; } }
-        Cell { width: 76px; tip: r.tip-p1; T { text: r.p1; vertical-alignment: center; } }
+        Cell { width: root.compact ? 84px : 92px; tip: r.tip-p; T { text: r.p; vertical-alignment: center; overflow: elide; } }
+        Cell { width: root.compact ? 64px : 76px; tip: r.tip-expected; T { text: r.expected; vertical-alignment: center; } }
+        Cell { width: root.compact ? 40px : 52px; T { text: "\{r.got}"; vertical-alignment: center; font-weight: 700; } }
+        Cell { width: root.compact ? 68px : 76px; tip: r.tip-p1; T { text: r.p1; vertical-alignment: center; } }
         Cell {
-            width: 190px;
+            width: root.compact ? 116px : 190px;
             tip: r.tip-luck;
             HorizontalLayout {
                 spacing: 8px;
@@ -84,11 +85,14 @@ component Row inherits Rectangle {
                 Dim { width: 46px; text: r.luck-text; vertical-alignment: center; horizontal-alignment: right; }
             }
         }
-        Cell { width: 76px; tip: r.tip-dry; T { text: r.dry; vertical-alignment: center; color: Theme.text-dim; } }
+        // Dry = 1 − P(≥1): dropped first when the window is too narrow for every column
+        if !root.compact: Cell { width: 76px; tip: r.tip-dry; T { text: r.dry; vertical-alignment: center; color: Theme.text-dim; } }
     }
 }
 
 export component OddsPage inherits Rectangle {
+    // below this the fixed numeric columns would squeeze the item names to nothing
+    property <bool> compact: root.width < 1000px;
     VerticalLayout {
         padding: 28px;
         spacing: 14px;
@@ -136,19 +140,19 @@ export component OddsPage inherits Rectangle {
                     spacing: 10px;
                     height: 28px;
                     HeadCell { horizontal-stretch: 3; text: "Item"; column-id: 0; clicked => { Backend.sort-odds(0); } }
-                    HeadCell { width: 100px; text: "Rarity"; column-id: 1; clicked => { Backend.sort-odds(1); } }
-                    HeadCell { width: 70px; text: "p"; column-id: 2; clicked => { Backend.sort-odds(2); } }
-                    HeadCell { width: 76px; text: "Expected"; column-id: 3; clicked => { Backend.sort-odds(3); } }
-                    HeadCell { width: 52px; text: "Got"; column-id: 4; clicked => { Backend.sort-odds(4); } }
-                    HeadCell { width: 76px; text: "P(≥1)"; column-id: 5; clicked => { Backend.sort-odds(5); } }
-                    HeadCell { width: 190px; text: "Luck"; column-id: 6; clicked => { Backend.sort-odds(6); } }
-                    HeadCell { width: 76px; text: "Dry"; column-id: 7; clicked => { Backend.sort-odds(7); } }
+                    HeadCell { width: root.compact ? 86px : 100px; text: "Rarity"; column-id: 1; clicked => { Backend.sort-odds(1); } }
+                    HeadCell { width: root.compact ? 84px : 92px; text: "p"; column-id: 2; clicked => { Backend.sort-odds(2); } }
+                    HeadCell { width: root.compact ? 64px : 76px; text: "Expected"; column-id: 3; clicked => { Backend.sort-odds(3); } }
+                    HeadCell { width: root.compact ? 40px : 52px; text: "Got"; column-id: 4; clicked => { Backend.sort-odds(4); } }
+                    HeadCell { width: root.compact ? 68px : 76px; text: "P(≥1)"; column-id: 5; clicked => { Backend.sort-odds(5); } }
+                    HeadCell { width: root.compact ? 116px : 190px; text: "Luck"; column-id: 6; clicked => { Backend.sort-odds(6); } }
+                    if !root.compact: HeadCell { width: 76px; text: "Dry"; column-id: 7; clicked => { Backend.sort-odds(7); } }
                 }
                 Rectangle { height: 1px; background: Theme.border; }
                 ScrollBox {
                     VerticalLayout {
                         spacing: 2px;
-                        for r in Backend.odds: Row { r: r; }
+                        for r in Backend.odds: Row { r: r; compact: root.compact; }
                     }
                 }
             }
