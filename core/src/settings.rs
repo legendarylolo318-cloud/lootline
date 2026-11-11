@@ -124,9 +124,13 @@ impl Settings {
     }
 }
 
+/// Calibrated on live Fortnite audio (process loopback, 0.75 s chest template): real chests
+/// scored 0.53-0.57 and background 0.24-0.44, so the default (0.5) sits at 0.50 between them.
+/// The old mapping (0.71 at default) came from synthetic audio and rejected every real chest.
+/// False positives are further limited by the interact-key gate.
 pub fn threshold_for(sensitivity: f32) -> f32 {
-    let s = sensitivity.clamp(0.0, 1.0);
-    0.92 - 0.42 * s
+    let s = if sensitivity.is_finite() { sensitivity.clamp(0.0, 1.0) } else { 0.5 };
+    0.70 - 0.40 * s
 }
 
 #[cfg(test)]
@@ -181,6 +185,9 @@ mod tests {
     fn threshold_is_monotonic() {
         assert!(threshold_for(0.0) > threshold_for(0.5));
         assert!(threshold_for(0.5) > threshold_for(1.0));
-        assert!(threshold_for(1.0) > 0.4);
+        assert!(threshold_for(1.0) > 0.29);
+        // default sits between measured background (<= 0.44) and real chests (>= 0.53)
+        let d = threshold_for(0.5);
+        assert!(d > 0.44 && d < 0.53, "{d}");
     }
 }

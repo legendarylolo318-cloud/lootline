@@ -180,6 +180,7 @@ export component SettingsPage inherits Rectangle {
                 }
                 Dim { text: Backend.template-status; }
                 Dim { text: Backend.templates-info; }
+                if Backend.detect-debug != "": Dim { text: Backend.detect-debug; color: Theme.accent; }
             }
 
             Section {

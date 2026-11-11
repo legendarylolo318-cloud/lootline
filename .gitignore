@@ -4,3 +4,5 @@ dist/
 *.db
 *.db-wal
 *.db-shm
+detect.log
+audio.f32

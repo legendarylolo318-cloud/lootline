@@ -43,6 +43,14 @@ pub enum Event {
         score: f32,
     },
     RecordingDone(Result<TemplateFile, String>),
+    /// Once a second while listening: the best template score over that second and the
+    /// threshold it has to beat (for the live detection monitor in Settings).
+    Meter {
+        best: f32,
+        threshold: f32,
+        /// Interact key pressed within the last 2 s.
+        key_recent: bool,
+    },
 }
 
 pub enum Command {
@@ -166,6 +174,13 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
     let mut last_scan: Option<Instant> = None;
     let mut backoff = Backoff::default();
     let mut gate = Gate::default();
+    let mut meter_best = 0.0f32;
+    let mut meter_at = Instant::now();
+    // Opt-in troubleshooting aid: LOOTLINE_AUDIO_DUMP=<file> appends the captured mono 48 kHz
+    // f32 samples (Fortnite's audio only) to a local file for offline tuning. Off by default.
+    let mut dump = std::env::var_os("LOOTLINE_AUDIO_DUMP")
+        .and_then(|p| std::fs::OpenOptions::new().create(true).append(true).open(p).ok())
+        .map(std::io::BufWriter::new);
     let mut recording: Option<Recording> = None;
     let mut frames: Vec<Frame> = Vec::with_capacity(16);
     let mut pending: Option<Command> = None;
@@ -272,7 +287,9 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
                             if let Some(rec) = &mut recording {
                                 rec.frames.push(f);
                             }
-                            if let Some(d) = matcher.push_frame(f) {
+                            let hit = matcher.push_frame(f);
+                            meter_best = meter_best.max(matcher.last_score());
+                            if let Some(d) = hit {
                                 match gate.judge(Instant::now(), d.duration_secs, |w| keys.held_within(w)) {
                                     Ok(()) => emit(Event::ChestDetected { score: d.score, template: d.template }),
                                     Err(reason) => emit(Event::Ignored { reason, score: d.score }),
@@ -280,7 +297,21 @@ fn run(cfg: Config, cmds: Receiver<Command>, emit: impl Fn(Event)) {
                             }
                         }
                     }
+                    if let Some(w) = &mut dump {
+                        use std::io::Write;
+                        let bytes: Vec<u8> = mono.iter().flat_map(|v| v.to_le_bytes()).collect();
+                        let _ = w.write_all(&bytes);
+                    }
                     cap.recycle(mono);
+                    if !matcher.is_empty() && meter_at.elapsed() >= Duration::from_secs(1) {
+                        emit(Event::Meter {
+                            best: meter_best,
+                            threshold: matcher.threshold,
+                            key_recent: keys.held_within(Duration::from_secs(2)),
+                        });
+                        meter_best = 0.0;
+                        meter_at = Instant::now();
+                    }
                 }
                 Ok(CapMsg::Ended(why)) => ended = Some(why),
                 Err(mpsc::RecvTimeoutError::Timeout) => {

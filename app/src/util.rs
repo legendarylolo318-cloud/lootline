@@ -89,6 +89,11 @@ pub fn fmt_clock(ts_ms: i64) -> String {
     local(ts_ms).format(format_description!("[hour]:[minute]")).unwrap_or_default()
 }
 
+/// "14:05:09"
+pub fn fmt_clock_secs(ts_ms: i64) -> String {
+    local(ts_ms).format(format_description!("[hour]:[minute]:[second]")).unwrap_or_default()
+}
+
 /// "Nov 10, 14:05"
 pub fn fmt_date_time(ts_ms: i64) -> String {
     local(ts_ms)

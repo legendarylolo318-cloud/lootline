@@ -76,6 +76,10 @@ fn main() {
         detector: None,
         #[cfg(windows)]
         game_pid: None,
+        #[cfg(windows)]
+        detect_meter: String::new(),
+        #[cfg(windows)]
+        detect_reject: String::new(),
         templates,
         overlay_chest: None,
         overlay_timer: Timer::default(),

@@ -66,6 +66,11 @@ pub struct App {
     pub detect_ok: bool,
     #[cfg(windows)]
     pub detector: Option<lootline_detect::DetectorHandle>,
+    /// Detection monitor lines (Settings): live score, and what happened to the last match.
+    #[cfg(windows)]
+    pub detect_meter: String,
+    #[cfg(windows)]
+    pub detect_reject: String,
     /// PID of the Fortnite process the detector last attached to.
     #[cfg(windows)]
     pub game_pid: Option<u32>,
@@ -308,6 +313,13 @@ impl App {
     #[cfg(windows)]
     pub fn on_detect(&mut self, e: lootline_detect::Event) {
         use lootline_detect::{Event as D, Status};
+        // Opt-in troubleshooting log: LOOTLINE_DETECT_LOG=<file>
+        if let Some(path) = std::env::var_os("LOOTLINE_DETECT_LOG") {
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+                let _ = writeln!(f, "{} {e:?}", fmt_clock_secs(now_ms()));
+            }
+        }
         match e {
             D::Status(Status::WaitingForGame) => {
                 self.detect_status = "Waiting for Fortnite".into();
@@ -331,12 +343,23 @@ impl App {
                 self.detect_status = format!("Audio error: {e}");
                 self.detect_ok = false;
             }
-            D::ChestDetected { .. } => {
+            D::ChestDetected { score, .. } => {
+                self.detect_reject = format!("last match {score:.2} counted");
                 if self.settings.detection_enabled {
                     self.add_chest();
                 }
             }
-            D::Ignored { .. } => {}
+            D::Ignored { reason, score } => {
+                self.detect_reject = format!("last match {score:.2} was rejected: {reason}");
+            }
+            D::Meter { best, threshold, .. } => {
+                self.detect_meter = format!("live match score {best:.2} (counts at {threshold:.2} and above)");
+                // the meter ticks every second: update just this line, not every model
+                if let Some(ui) = self.ui.upgrade() {
+                    ui.global::<Backend>().set_detect_debug(self.detect_debug_text().into());
+                }
+                return;
+            }
             D::RecordingDone(res) => {
                 self.recording = false;
                 match res {
@@ -365,6 +388,23 @@ impl App {
             }
         }
         self.refresh();
+    }
+
+    pub fn detect_debug_text(&self) -> String {
+        #[cfg(windows)]
+        {
+            if !self.detect_ok {
+                return String::new();
+            }
+            [self.detect_meter.as_str(), self.detect_reject.as_str()]
+                .iter()
+                .filter(|s| !s.is_empty())
+                .copied()
+                .collect::<Vec<_>>()
+                .join("  ·  ")
+        }
+        #[cfg(not(windows))]
+        String::new()
     }
 
     pub fn reload_templates(&mut self) {

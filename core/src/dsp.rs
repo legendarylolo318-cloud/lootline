@@ -361,23 +361,53 @@ impl Matcher {
     }
 }
 
-/// Trim a raw recording (a few seconds around the sound) to just the sound: keeps the frames
-/// whose mean log-energy rises clearly above the noise floor, with 2 frames of padding.
+/// Longest template kept (~1.3 s); the chest sound is well under a second.
+pub const MAX_TEMPLATE_FRAMES: usize = 120;
+
+/// Trim a raw recording (a few seconds of game audio around the sound) to just the sound.
+///
+/// Game audio is never silent (music, footsteps, wind), so "first frame above the noise floor"
+/// lands on background. Instead the template is anchored on the loudest moment (energy smoothed
+/// over 3 frames) and grown outwards only while the energy stays clearly above the background
+/// level, tolerating dips of up to 3 frames inside the sound, then padded by 2 frames.
 pub fn trim_recording(frames: &[Frame]) -> Result<Vec<Frame>> {
     ensure!(frames.len() >= 10, "recording too short");
     // total linear energy (log of the sum), robust to a sound occupying only a few bands
-    let e: Vec<f32> = frames.iter().map(|f| f.iter().map(|v| v.exp()).sum::<f32>().max(1e-9).ln()).collect();
+    let raw: Vec<f32> = frames.iter().map(|f| f.iter().map(|v| v.exp()).sum::<f32>().max(1e-9).ln()).collect();
+    let n = raw.len();
+    let e: Vec<f32> = (0..n)
+        .map(|i| {
+            let (a, b) = (i.saturating_sub(1), (i + 1).min(n - 1));
+            raw[a..=b].iter().sum::<f32>() / (b - a + 1) as f32
+        })
+        .collect();
     let mut sorted = e.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let floor = sorted[sorted.len() / 2];
-    let peak = sorted[sorted.len() - 1];
-    ensure!(peak - floor > 1.0, "no clear sound found in the recording (too quiet or too noisy)");
-    let thr = floor + 0.25 * (peak - floor);
-    let first = e.iter().position(|&v| v > thr).unwrap_or(0);
-    let last = e.iter().rposition(|&v| v > thr).unwrap_or(e.len() - 1);
+    let floor = sorted[n / 2];
+    let (peak_i, peak) =
+        e.iter().copied().enumerate().fold((0, f32::MIN), |best, (i, v)| if v > best.1 { (i, v) } else { best });
+    ensure!(
+        peak - floor > 1.0,
+        "no clear sound found in the recording (too quiet, or drowned out by other game audio)"
+    );
+    let thr = floor + 0.4 * (peak - floor);
+    let above = |i: usize| e[i] > thr;
+    const GAP: usize = 3;
+    // grow left (the onset is close to the peak, so allow only a short lead-in)
+    let mut first = peak_i;
+    while first > 0 && peak_i - first < 30 && (1..=GAP).any(|d| first >= d && above(first - d)) {
+        first -= 1;
+    }
+    // grow right (the decay can be long)
+    let mut last = peak_i;
+    while last + 1 < n
+        && last - first + 1 < MAX_TEMPLATE_FRAMES - 4
+        && (1..=GAP).any(|d| last + d < n && above(last + d))
+    {
+        last += 1;
+    }
     let start = first.saturating_sub(2);
-    let end = (last + 3).min(frames.len());
-    let end = end.min(start + 150);
+    let end = (last + 3).min(n).min(start + MAX_TEMPLATE_FRAMES);
     ensure!(end - start >= 6, "detected sound is too short (<6 frames)");
     Ok(frames[start..end].to_vec())
 }
@@ -496,6 +526,44 @@ mod tests {
         // 0.5 s chime ~ 47 frames, plus padding; must be far shorter than the 1.5 s recording
         assert!(t.frames.len() > 20 && t.frames.len() < 80, "len {}", t.frames.len());
         t.validate().unwrap();
+    }
+
+    /// Harsh synthetic game background: a noise bed with loud broadband bursts every 0.4 s.
+    fn game_background(secs: f32, seed: u64) -> Vec<f32> {
+        let n = (SAMPLE_RATE as f32 * secs) as usize;
+        let mut r = Lcg(seed);
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / SAMPLE_RATE as f32;
+                let burst = if (t % 0.4) < 0.08 { 0.12 } else { 0.03 };
+                r.next() * burst
+            })
+            .collect()
+    }
+
+    #[test]
+    fn trim_finds_a_late_sound_in_busy_game_audio() {
+        // Regression: a real 4 s in-game recording with the chest near the end. The old trimmer
+        // started at the first background burst and capped at 150 frames, cutting the chest off.
+        let mut rec = game_background(3.3, 61);
+        let bg_tail = game_background(0.7, 62);
+        rec.extend(chime(0.5).iter().zip(bg_tail.iter().chain(std::iter::repeat(&0.0))).map(|(c, b)| c + b));
+        rec.extend(game_background(0.2, 63));
+        let t = trim_recording(&frames_of(&rec)).unwrap();
+        assert!(t.len() >= 20 && t.len() <= 80, "template should be about the chime (~47 frames), got {}", t.len());
+        // it must detect a chime in fresh background
+        let tf = TemplateFile::from_frames("chest", "", &t);
+        let mut m = Matcher::new(std::slice::from_ref(&tf), crate::settings::threshold_for(0.5));
+        let mut audio = game_background(1.5, 71);
+        let tail = game_background(0.5, 72);
+        audio.extend(chime(0.5).iter().zip(tail.iter()).map(|(c, b)| c + b));
+        audio.extend(game_background(1.5, 73));
+        let d = run(&mut m, &audio);
+        assert_eq!(d.iter().filter(|d| d.score > 0.8).count(), 1, "detections: {d:?}");
+        // These bursts are far harsher than real game audio (live Fortnite background measured
+        // <= 0.46, see settings::threshold_for), so check them at a stricter setting.
+        let mut m2 = Matcher::new(&[tf], crate::settings::threshold_for(0.25));
+        assert!(run(&mut m2, &game_background(6.0, 81)).is_empty());
     }
 
     #[test]

@@ -355,6 +355,7 @@ impl App {
         // ---- settings status strings
         b.set_recording(self.recording);
         b.set_template_status(self.template_status.clone().into());
+        b.set_detect_debug(self.detect_debug_text().into());
         b.set_loot_status(self.loot_status.clone().into());
         b.set_settings_msg(self.settings_msg.clone().into());
         b.set_theme_msg(self.theme_msg.clone().into());
