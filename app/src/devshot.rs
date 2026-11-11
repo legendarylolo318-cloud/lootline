@@ -68,7 +68,7 @@ fn bmp(w: u32, h: u32, rgba: &[u8]) -> Vec<u8> {
     out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&32u16.to_le_bytes());
     out.extend_from_slice(&[0u8; 24]);
-    for px in rgba.chunks_exact(4) {
+    for px in rgba.as_chunks::<4>().0 {
         out.extend_from_slice(&[px[2], px[1], px[0], 255]);
     }
     out
